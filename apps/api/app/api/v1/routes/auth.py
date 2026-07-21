@@ -1,0 +1,228 @@
+import secrets
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_supabase_user, get_current_user, get_db
+from app.core.config import get_settings
+from app.core.rate_limit import limiter
+from app.core.security import SupabaseUser
+from app.models.organization import (
+    Organization,
+    OrganizationInvite,
+    OrganizationMember,
+    OrganizationRole,
+)
+from app.models.user import User
+from app.schemas.auth import (
+    InviteMemberRequest,
+    InviteMemberResponse,
+    MeResponse,
+    OrganizationOut,
+    SyncUserRequest,
+    UserOut,
+)
+from app.services.audit import record_audit_event
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+LOCK_THRESHOLD = 5
+LOCK_DURATION_MINUTES = 15
+
+
+@router.post("/sync", response_model=MeResponse)
+def sync_user(
+    payload: SyncUserRequest,
+    request: Request,
+    supabase_user: SupabaseUser = Depends(get_current_supabase_user),
+    db: Session = Depends(get_db),
+) -> MeResponse:
+    """Chiamato dal frontend subito dopo login/registrazione riuscita su Supabase.
+
+    Crea (o aggiorna) lo specchio locale dell'utente. Alla primissima sincronizzazione,
+    se non esiste ancora nessuna organizzazione associata, ne crea una (richiesto per poter
+    usare Assessment/Compliance Tracker/etc. che sono sempre legati a un'organizzazione).
+    """
+    if supabase_user.email is None:
+        raise HTTPException(status_code=400, detail="Token senza email valida")
+
+    user = db.get(User, supabase_user.id)
+    is_new_user = user is None
+    if user is None:
+        user = User(id=supabase_user.id, email=supabase_user.email, full_name=payload.full_name)
+        db.add(user)
+    else:
+        user.email = supabase_user.email
+        if payload.full_name:
+            user.full_name = payload.full_name
+    db.commit()
+    db.refresh(user)
+
+    if is_new_user:
+        org_name = payload.organization_name or f"Organizzazione di {user.email}"
+        organization = Organization(name=org_name)
+        db.add(organization)
+        db.commit()
+        db.refresh(organization)
+
+        membership = OrganizationMember(
+            user_id=user.id,
+            organization_id=organization.id,
+            role=OrganizationRole.admin,
+            joined_at=datetime.now(timezone.utc),
+        )
+        db.add(membership)
+        db.commit()
+
+        record_audit_event(
+            db,
+            action="user.registered",
+            user_id=user.id,
+            organization_id=organization.id,
+            entity="user",
+            ip_address=request.client.host if request.client else None,
+        )
+    else:
+        record_audit_event(
+            db,
+            action="user.login",
+            user_id=user.id,
+            entity="user",
+            ip_address=request.client.host if request.client else None,
+        )
+
+    return _build_me_response(db, user)
+
+
+@router.get("/me", response_model=MeResponse)
+def read_me(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MeResponse:
+    return _build_me_response(db, user)
+
+
+def _build_me_response(db: Session, user: User) -> MeResponse:
+    memberships = user.memberships
+    org_ids = [m.organization_id for m in memberships]
+    organizations = (
+        db.query(Organization).filter(Organization.id.in_(org_ids)).all() if org_ids else []
+    )
+    return MeResponse(
+        user=UserOut.model_validate(user),
+        organizations=[OrganizationOut.model_validate(o) for o in organizations],
+    )
+
+
+class LoginEvent(BaseModel):
+    email: str
+    success: bool
+
+
+@router.post("/login-events")
+@limiter.limit(get_settings().login_rate_limit)
+def record_login_event(
+    request: Request,
+    payload: LoginEvent,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Registrato dal frontend dopo ogni tentativo di login su Supabase (riuscito o no).
+
+    Applica rate limiting per IP (Fase 1) e blocco temporaneo dell'account dopo troppi
+    tentativi falliti consecutivi.
+    """
+    ip = request.client.host if request.client else None
+    user = db.query(User).filter(User.email == payload.email).first()
+
+    if user is not None:
+        if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail="Account temporaneamente bloccato per troppi tentativi falliti. "
+                f"Riprova dopo {user.locked_until.isoformat()}.",
+            )
+
+        if payload.success:
+            user.failed_login_count = 0
+            user.locked_until = None
+        else:
+            user.failed_login_count += 1
+            if user.failed_login_count >= LOCK_THRESHOLD:
+                user.locked_until = datetime.now(timezone.utc) + timedelta(
+                    minutes=LOCK_DURATION_MINUTES
+                )
+        db.commit()
+
+    record_audit_event(
+        db,
+        action="user.login_attempt",
+        user_id=user.id if user else None,
+        entity="user",
+        details={"success": payload.success, "email": payload.email},
+        ip_address=ip,
+    )
+    return {"status": "recorded"}
+
+
+@router.post("/organizations/{organization_id}/invites", response_model=InviteMemberResponse)
+def invite_member(
+    organization_id: str,
+    payload: InviteMemberRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InviteMemberResponse:
+    """Crea un invito per un collaboratore. L'invio effettivo dell'email arriva in Fase 7
+    (provider email transazionale); per ora l'invito viene creato e loggato, pronto per
+    essere collegato all'invio reale."""
+    membership = (
+        db.query(OrganizationMember)
+        .filter(
+            OrganizationMember.organization_id == organization_id,
+            OrganizationMember.user_id == user.id,
+        )
+        .first()
+    )
+    if membership is None or membership.role != OrganizationRole.admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo un admin dell'organizzazione può invitare collaboratori",
+        )
+
+    role = (
+        OrganizationRole(payload.role)
+        if payload.role in OrganizationRole._value2member_map_
+        else OrganizationRole.viewer
+    )
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+
+    invite = OrganizationInvite(
+        organization_id=organization_id,
+        invited_email=payload.email,
+        role=role,
+        invited_by=user.id,
+        token=token,
+        expires_at=expires_at,
+    )
+    db.add(invite)
+    db.commit()
+
+    record_audit_event(
+        db,
+        action="organization.member_invited",
+        user_id=user.id,
+        organization_id=organization_id,
+        entity="organization_invite",
+        details={"invited_email": payload.email, "role": role.value},
+        ip_address=request.client.host if request.client else None,
+    )
+
+    # L'invio effettivo dell'email con il link di invito arriva in Fase 7 (provider email
+    # transazionale). Per ora l'invito è creato e persistito, pronto per essere spedito.
+
+    return InviteMemberResponse(
+        invited_email=payload.email, invite_token=token, expires_at=expires_at
+    )

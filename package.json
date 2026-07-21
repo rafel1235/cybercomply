@@ -1,0 +1,16 @@
+{
+  "name": "cybercomplyit",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/web",
+    "packages/shared"
+  ],
+  "scripts": {
+    "web:dev": "pnpm --filter @cybercomplyit/web dev",
+    "web:build": "pnpm --filter @cybercomplyit/web build",
+    "web:lint": "pnpm --filter @cybercomplyit/web lint",
+    "shared:build": "pnpm --filter @cybercomplyit/shared build"
+  }
+}

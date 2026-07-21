@@ -1,0 +1,12 @@
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "I", "B", "UP"]
+# E501: righe lunghe tollerate (formattate da black)
+# B008: Depends(...) come default è il pattern idiomatico FastAPI, non un bug
+# UP017: `datetime.UTC` richiede Python 3.11+; usiamo `timezone.utc` per compatibilità 3.10+
+ignore = ["E501", "B008", "UP017"]
+
+[lint.per-file-ignores]
+"migrations/versions/*" = ["I001"]
