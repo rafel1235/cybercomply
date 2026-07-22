@@ -38,3 +38,6 @@ Thumbs.db
 coverage/
 htmlcov/
 .coverage
+
+# Backup locali del database (mai committare dump con dati reali)
+apps/api/backups/

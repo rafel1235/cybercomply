@@ -10,6 +10,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.assessment import AssessmentResult
+    from app.models.compliance import ComplianceMeasure
+    from app.models.document import Document
+    from app.models.incident import Incident
+    from app.models.subscription import Subscription
+    from app.models.supplier import Supplier
     from app.models.user import User
 
 
@@ -37,6 +43,24 @@ class Organization(Base):
     )
     invites: Mapped[list["OrganizationInvite"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan"
+    )
+    assessment_results: Mapped[list["AssessmentResult"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+    compliance_measures: Mapped[list["ComplianceMeasure"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+    documents: Mapped[list["Document"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+    incidents: Mapped[list["Incident"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+    suppliers: Mapped[list["Supplier"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+    subscription: Mapped["Subscription | None"] = relationship(
+        back_populates="organization", cascade="all, delete-orphan", uselist=False
     )
 
 

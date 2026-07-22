@@ -3,7 +3,8 @@
 Piattaforma SaaS italiana di cyber-compliance per PMI (NIS2, Cyber Resilience Act,
 D.Lgs. 138/2024). Questo repository segue la Roadmap Tecnica interna, fase per fase.
 
-Stato di avanzamento: **Fase 0 (Setup) + Fase 1 (Autenticazione)** — vedi `docs/ROADMAP_PROGRESS.md`.
+Stato di avanzamento: **Fase 0 (Setup) + Fase 1 (Autenticazione) + Fase 2 (Modello dati
+completo)** — vedi `docs/ROADMAP_PROGRESS.md`.
 
 ## Struttura
 
@@ -55,6 +56,31 @@ pnpm dev
 ```
 
 Frontend disponibile su http://localhost:3000
+
+## Dati di sviluppo (seed) e backup
+
+Dopo aver applicato le migration, puoi popolare il database locale con dati fittizi ma
+realistici (3 aziende con profili NIS2 diversi, utenti, assessment, misure di conformità,
+documenti, un incidente, fornitori, abbonamento):
+
+```bash
+cd apps/api
+python -m scripts.seed_dev_data
+```
+
+Per un backup manuale del database (oltre a quelli automatici già inclusi da Supabase in
+produzione):
+
+```bash
+DATABASE_URL="postgresql://..." ./scripts/backup_db.sh
+```
+
+## Row Level Security (Supabase)
+
+`infra/supabase/rls_policies.sql` contiene le policy RLS che isolano i dati per
+organizzazione. Vanno eseguite una volta, dopo le migration, dallo SQL Editor del tuo
+progetto Supabase reale (richiedono la funzione `auth.uid()`, non disponibile su un
+Postgres locale generico).
 
 ## Variabili d'ambiente richieste
 
