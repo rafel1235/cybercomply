@@ -10,7 +10,8 @@ Roadmap Tecnica CyberComplyIT.
 - [x] Package manager: pnpm workspaces (JS/TS) + venv/requirements (Python)
 - [x] README con istruzioni di setup
 - [x] Scelte di stack documentate con motivazione (`docs/STACK_DECISIONS.md`)
-- [ ] Repository GitHub privato reale — **richiede account GitHub del titolare**, non creabile da qui
+- [x] Repository Git locale inizializzato con commit iniziale
+- [ ] Push su repository GitHub privato reale — **richiede account GitHub del titolare**
 
 ## Fase 1 — Autenticazione e gestione account — ✅ completata (parti eseguibili da qui)
 - [x] Integrazione Supabase Auth (client frontend + verifica JWT backend)
@@ -28,6 +29,16 @@ Roadmap Tecnica CyberComplyIT.
 - [x] Header di sicurezza HTTP (HSTS, X-Content-Type-Options, X-Frame-Options, CSP)
 - [ ] Progetto Supabase reale collegato — **richiede credenziali reali del titolare** (placeholder
       pronti in `.env.example`)
+
+## Verifica eseguita (non solo scritta: testata davvero)
+- Backend: avviato un vero PostgreSQL locale (via `pgserver`, senza Docker), generata e
+  applicata la migration Alembic iniziale, eseguiti i 9 test automatici (pytest) — **9/9
+  passati**: registrazione/sync, idempotenza, token mancante/non valido rigettato (401),
+  blocco account dopo 5 tentativi falliti (423), invito collaboratore riservato agli admin.
+- Backend: lint (`ruff`) e formattazione (`black`) puliti, zero errori.
+- Frontend: build di produzione Next.js completata con successo (12 route generate),
+  `next lint` pulito, `tsc --noEmit` senza errori su tutto il codice TypeScript.
+- Repository Git locale creato con commit iniziale in questa cartella.
 
 ## Fasi successive (non ancora iniziate)
 Fase 2 (schema dati completo oltre auth), Fase 3 (API complete), Fase 4 (frontend completo),
