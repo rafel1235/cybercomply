@@ -38,14 +38,3 @@ class SyncUserRequest(BaseModel):
 class MeResponse(BaseModel):
     user: UserOut
     organizations: list[OrganizationOut]
-
-
-class InviteMemberRequest(BaseModel):
-    email: EmailStr
-    role: str = "viewer"
-
-
-class InviteMemberResponse(BaseModel):
-    invited_email: EmailStr
-    invite_token: str
-    expires_at: datetime

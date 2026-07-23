@@ -41,3 +41,6 @@ htmlcov/
 
 # Backup locali del database (mai committare dump con dati reali)
 apps/api/backups/
+
+# Storage locale (PDF generati), placeholder finché non collegato a Supabase Storage
+apps/api/storage/

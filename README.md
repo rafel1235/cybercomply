@@ -4,7 +4,8 @@ Piattaforma SaaS italiana di cyber-compliance per PMI (NIS2, Cyber Resilience Ac
 D.Lgs. 138/2024). Questo repository segue la Roadmap Tecnica interna, fase per fase.
 
 Stato di avanzamento: **Fase 0 (Setup) + Fase 1 (Autenticazione) + Fase 2 (Modello dati
-completo)** — vedi `docs/ROADMAP_PROGRESS.md`.
+completo) + Fase 3 (API completa: organizzazione, assessment, compliance, documenti,
+incidenti, fornitori)** — vedi `docs/ROADMAP_PROGRESS.md`.
 
 ## Struttura
 

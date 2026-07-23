@@ -83,23 +83,3 @@ def test_login_event_locks_account_after_repeated_failures(client):
         json={"email": "target@cybercomplyit.it", "success": False},
     )
     assert locked_response.status_code == 423
-
-
-def test_invite_requires_admin_role(client):
-    admin_token = make_token(email="admin@cybercomplyit.it")
-    sync_resp = client.post(
-        "/api/v1/auth/sync",
-        json={"organization_name": "Invite Org"},
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    org_id = sync_resp.json()["organizations"][0]["id"]
-
-    invite_resp = client.post(
-        f"/api/v1/auth/organizations/{org_id}/invites",
-        json={"email": "collega@cybercomplyit.it", "role": "viewer"},
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert invite_resp.status_code == 200
-    body = invite_resp.json()
-    assert body["invited_email"] == "collega@cybercomplyit.it"
-    assert len(body["invite_token"]) > 20

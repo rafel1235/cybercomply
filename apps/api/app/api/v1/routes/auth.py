@@ -1,4 +1,3 @@
-import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -9,21 +8,9 @@ from app.api.deps import get_current_supabase_user, get_current_user, get_db
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
 from app.core.security import SupabaseUser
-from app.models.organization import (
-    Organization,
-    OrganizationInvite,
-    OrganizationMember,
-    OrganizationRole,
-)
+from app.models.organization import Organization, OrganizationMember, OrganizationRole
 from app.models.user import User
-from app.schemas.auth import (
-    InviteMemberRequest,
-    InviteMemberResponse,
-    MeResponse,
-    OrganizationOut,
-    SyncUserRequest,
-    UserOut,
-)
+from app.schemas.auth import MeResponse, OrganizationOut, SyncUserRequest, UserOut
 from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -164,65 +151,3 @@ def record_login_event(
         ip_address=ip,
     )
     return {"status": "recorded"}
-
-
-@router.post("/organizations/{organization_id}/invites", response_model=InviteMemberResponse)
-def invite_member(
-    organization_id: str,
-    payload: InviteMemberRequest,
-    request: Request,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> InviteMemberResponse:
-    """Crea un invito per un collaboratore. L'invio effettivo dell'email arriva in Fase 7
-    (provider email transazionale); per ora l'invito viene creato e loggato, pronto per
-    essere collegato all'invio reale."""
-    membership = (
-        db.query(OrganizationMember)
-        .filter(
-            OrganizationMember.organization_id == organization_id,
-            OrganizationMember.user_id == user.id,
-        )
-        .first()
-    )
-    if membership is None or membership.role != OrganizationRole.admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo un admin dell'organizzazione può invitare collaboratori",
-        )
-
-    role = (
-        OrganizationRole(payload.role)
-        if payload.role in OrganizationRole._value2member_map_
-        else OrganizationRole.viewer
-    )
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-
-    invite = OrganizationInvite(
-        organization_id=organization_id,
-        invited_email=payload.email,
-        role=role,
-        invited_by=user.id,
-        token=token,
-        expires_at=expires_at,
-    )
-    db.add(invite)
-    db.commit()
-
-    record_audit_event(
-        db,
-        action="organization.member_invited",
-        user_id=user.id,
-        organization_id=organization_id,
-        entity="organization_invite",
-        details={"invited_email": payload.email, "role": role.value},
-        ip_address=request.client.host if request.client else None,
-    )
-
-    # L'invio effettivo dell'email con il link di invito arriva in Fase 7 (provider email
-    # transazionale). Per ora l'invito è creato e persistito, pronto per essere spedito.
-
-    return InviteMemberResponse(
-        invited_email=payload.email, invite_token=token, expires_at=expires_at
-    )

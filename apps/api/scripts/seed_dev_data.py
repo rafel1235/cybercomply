@@ -42,29 +42,10 @@ from app.models import (
     SupplierStatus,
     User,
 )
+from app.services.compliance_catalog import COMPLIANCE_MEASURE_IDS
 
 fake = Faker("it_IT")
 Faker.seed(42)
-
-# Le 15 misure della Det. ACN 164179/2025 citate nella Guida al Servizio (§2.2), usate come
-# catalogo statico lato applicazione (non una tabella, come già annotato in compliance.py).
-COMPLIANCE_MEASURE_IDS = [
-    "valutazione_rischio_annuale",
-    "mfa_accessi_remoti_privilegiati",
-    "backup_cifrati_testati",
-    "vulnerability_scanning_periodico",
-    "piano_business_continuity",
-    "formazione_personale_annuale",
-    "registro_fornitori_ict_critici",
-    "gestione_incidenti_procedura",
-    "crittografia_dati_a_riposo",
-    "controllo_accessi_privilegi_minimi",
-    "segmentazione_rete",
-    "patch_management",
-    "monitoraggio_log_centralizzato",
-    "piano_disaster_recovery_testato",
-    "revisione_contratti_fornitori_ict",
-]
 
 ORG_PROFILES = [
     {
@@ -115,18 +96,26 @@ def seed() -> None:
             db.add(org)
             db.flush()
 
-            admin_user = User(id=uuid.uuid4(), email=fake.company_email(), full_name=fake.name())
-            viewer_user = User(id=uuid.uuid4(), email=fake.company_email(), full_name=fake.name())
+            admin_user = User(
+                id=uuid.uuid4(), email=fake.company_email(), full_name=fake.name()
+            )
+            viewer_user = User(
+                id=uuid.uuid4(), email=fake.company_email(), full_name=fake.name()
+            )
             db.add_all([admin_user, viewer_user])
             db.flush()
 
             db.add_all(
                 [
                     OrganizationMember(
-                        user_id=admin_user.id, organization_id=org.id, role=OrganizationRole.admin
+                        user_id=admin_user.id,
+                        organization_id=org.id,
+                        role=OrganizationRole.admin,
                     ),
                     OrganizationMember(
-                        user_id=viewer_user.id, organization_id=org.id, role=OrganizationRole.viewer
+                        user_id=viewer_user.id,
+                        organization_id=org.id,
+                        role=OrganizationRole.viewer,
                     ),
                 ]
             )
@@ -158,7 +147,11 @@ def seed() -> None:
                         organization_id=org.id,
                         measure_id=measure_id,
                         status=status,
-                        note=fake.sentence() if status != MeasureStatus.non_applicabile else None,
+                        note=(
+                            fake.sentence()
+                            if status != MeasureStatus.non_applicabile
+                            else None
+                        ),
                         updated_by=admin_user.id,
                     )
                 )
@@ -214,7 +207,9 @@ def seed() -> None:
                 supplier = Supplier(
                     organization_id=org.id,
                     name=fake.company(),
-                    category=fake.random_element(["Cloud provider", "MSP", "Sviluppo software"]),
+                    category=fake.random_element(
+                        ["Cloud provider", "MSP", "Sviluppo software"]
+                    ),
                     criticality=fake.random_element(list(SupplierCriticality)),
                     status=fake.random_element(list(SupplierStatus)),
                     last_reviewed_at=datetime.now(timezone.utc)

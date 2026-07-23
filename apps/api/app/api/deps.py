@@ -1,9 +1,12 @@
+from dataclasses import dataclass
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.security import InvalidTokenError, SupabaseUser, decode_supabase_jwt
 from app.db.session import get_db
+from app.models.organization import Organization, OrganizationMember, OrganizationRole
 from app.models.user import User
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -38,4 +41,58 @@ def get_current_user(
     return user
 
 
-__all__ = ["get_db", "get_current_supabase_user", "get_current_user"]
+@dataclass
+class CurrentMembership:
+    """L'organizzazione 'corrente' dell'utente autenticato, con il suo ruolo.
+
+    L'MVP assume un'organizzazione principale per utente (quella creata alla
+    registrazione, vedi Fase 1): se in futuro un utente potrà appartenere a più
+    organizzazioni (multi-tenant switch), qui si aggiungerà la lettura di un header
+    esplicito (es. `X-Organization-Id`) invece di prendere sempre la prima iscrizione.
+    """
+
+    organization: Organization
+    role: OrganizationRole
+    user: User
+
+
+def get_current_membership(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CurrentMembership:
+    membership = (
+        db.query(OrganizationMember)
+        .filter(OrganizationMember.user_id == user.id)
+        .order_by(OrganizationMember.joined_at.asc())
+        .first()
+    )
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nessuna organizzazione associata a questo utente",
+        )
+    organization = db.get(Organization, membership.organization_id)
+    if organization is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organizzazione non trovata")
+    return CurrentMembership(organization=organization, role=membership.role, user=user)
+
+
+def require_admin(membership: CurrentMembership = Depends(get_current_membership)) -> CurrentMembership:
+    """Dipendenza da usare sulle route riservate al ruolo Admin (i Viewer sono in sola
+    lettura, come definito in Fase 1)."""
+    if membership.role != OrganizationRole.admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operazione riservata agli amministratori dell'organizzazione",
+        )
+    return membership
+
+
+__all__ = [
+    "get_db",
+    "get_current_supabase_user",
+    "get_current_user",
+    "CurrentMembership",
+    "get_current_membership",
+    "require_admin",
+]
