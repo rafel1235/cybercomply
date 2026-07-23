@@ -81,7 +81,7 @@ Roadmap Tecnica CyberComplyIT.
       positive → conforme, nessuna → non conforme, altrimenti parziale) e sincronizzato
       sia sul questionario sia sulla scheda fornitore.
 
-## Fase 4 — Frontend completo dei moduli — ✅ codice completo, verifica build lato utente da confermare
+## Fase 4 — Frontend completo dei moduli — ✅ completata e verificata
 - [x] Setup: React Query (`QueryClientProvider`), sistema di toast globale (senza librerie
       esterne), hook `useApi()` (token Supabase sempre fresco), `ApiError` tipizzato con
       status HTTP, componenti UI riutilizzabili (`Badge`, `Skeleton`, `EmptyState`)
@@ -107,27 +107,66 @@ Roadmap Tecnica CyberComplyIT.
       calcolo dello stato di conformità sincronizzato su questionario e scheda fornitore
 
 **Nota sulla verifica di questa fase**: durante lo sviluppo, un tentativo di installare una
-libreria (poi rimossa, i grafici sono infatti SVG scritti a mano) ha corrotto
+libreria (poi rimossa, i grafici sono infatti SVG scritti a mano) aveva corrotto
 `apps/web/node_modules` nella cartella reale sincronizzata (symlink interni con errori di
-I/O). La cartella di lavoro sandbox usata per scrivere questo modulo non riesce a
-reinstallare pacchetti npm/pnpm entro i tempi disponibili — il problema è confinato del
-tutto a `node_modules` (rigenerabile, nessun codice o dato utente a rischio). Il codice di
-questo modulo è stato quindi scritto e rivisto manualmente (tipi TypeScript, entità JSX,
-import) ma **non ancora verificato con `next build` / `next lint` / `tsc --noEmit`** in
-questa sessione. Per completare la verifica, da PowerShell nella cartella del progetto:
+I/O). Il problema era confinato del tutto a `node_modules` (nessun codice o dato utente a
+rischio). Il titolare ha eseguito da PowerShell il reinstall (`Remove-Item -Recurse -Force
+node_modules` + `pnpm install`) e poi la build reale:
+- `pnpm --filter @cybercomplyit/web build` → **compilata con successo**, tutte le 17 route
+  generate correttamente (incluse tutte le pagine nuove di questa fase: dashboard,
+  assessment, compliance + report, incidenti + dettaglio, fornitori,
+  `/questionario/:token` pubblica), type-checking Next.js incluso nella build senza errori.
+- `pnpm --filter @cybercomplyit/web lint` → **nessun warning o errore ESLint**.
 
-```powershell
-cd apps/web
-Remove-Item -Recurse -Force node_modules
-cd ..\..
-pnpm install
-pnpm --filter @cybercomplyit/web build
-pnpm --filter @cybercomplyit/web lint
-```
+Fase 4 quindi confermata completa e verificata, non solo scritta.
 
-Se emergono errori da questi comandi, vanno segnalati per una correzione mirata.
+## Fase 5 — Generazione documenti con AI — ✅ completata e verificata
+- [x] `app/services/ai_client.py`: wrapper interno per l'API Messages di Claude via
+      `httpx` (nessuna nuova dipendenza — niente SDK `anthropic`, per non ripetere i
+      problemi di installazione avuti con `node_modules` in Fase 4). Retry con backoff
+      esponenziale su 429/500/503/529, timeout 30s, ritorna token usati e durata per ogni
+      chiamata.
+- [x] `app/services/document_prompts.py`: un prompt per ciascuno dei 9 tipi di documento,
+      con riferimenti normativi puntuali (articoli NIS2/CRA, sezioni Determinazione ACN
+      164179/2025) e personalizzazione con i dati reali dell'organizzazione (settore,
+      dipendenti, categoria NIS2/CRA dall'ultimo assessment).
+- [x] `app/services/ai_document_generator.py`: orchestratore che sceglie AI o segnaposto.
+      Se `ANTHROPIC_API_KEY` non è configurata, o la chiamata fallisce, o la risposta non è
+      nel formato JSON atteso, ricade sempre sul contenuto segnaposto esistente — la
+      generazione documenti non fallisce mai con un errore 500 per un problema lato AI.
+- [x] `POST /documents/generate` aggiornato per usare l'orchestratore; l'audit event
+      `document.generated` ora registra anche modello, token input/output, durata e costo
+      stimato (se configurato) di ogni chiamata AI, per il monitoraggio spesa richiesto
+      dalla roadmap.
+- [x] PDF: rinominato `pdf_stub.py` → `pdf_renderer.py` (il vecchio nome resta come shim
+      di compatibilità, non eliminabile in questo ambiente per permessi del filesystem
+      sincronizzato). Aggiunta intestazione (organizzazione + titolo), piè di pagina
+      (numero pagina, versione, data di generazione), e disclaimer quando il contenuto è
+      stato scritto dall'AI. Ancora nessuna libreria di rendering HTML→PDF (WeasyPrint/
+      Puppeteer): scelta deliberata per non introdurre nuove dipendenze in questo ambiente,
+      da rivalutare su un'infrastruttura di produzione più stabile.
+
+**Nota importante**: `ANTHROPIC_API_KEY` non è ancora stata impostata con un valore reale
+(resta il placeholder di `.env.example`). Tutto il codice di generazione AI è scritto,
+testato con chiamate mockate, e verificato che il fallback funzioni correttamente — ma non
+è stato eseguito nemmeno una volta contro la vera API Claude in questa sessione. Quando
+avrai una chiave reale, impostala in `apps/api/.env` come `ANTHROPIC_API_KEY` e verifica
+un paio di generazioni reali prima di considerare la Fase 5 pronta per i clienti (in
+particolare la qualità dei prompt, che la roadmap chiede di validare anche con un esperto
+legale prima del lancio commerciale).
 
 ## Verifica eseguita (non solo scritta: testata davvero)
+- Backend Fase 5: migration riapplicate da zero su Postgres reale, **86/86 test
+  automatici passati** (65 precedenti + 21 nuovi: retry/backoff/timeout del client AI con
+  chiamate HTTP mockate, fallback al segnaposto in tutti i casi previsti — non configurata,
+  JSON non valido, numero di sezioni sbagliato, eccezione dopo i retry — parsing corretto
+  di una risposta AI valida anche se avvolta in un blocco ```json, e verifica che l'audit
+  log registri token/costo/modello). **Nessuna chiamata reale all'API Claude eseguita**:
+  `ANTHROPIC_API_KEY` non è ancora impostata con un valore vero. Copertura: **96%** (1531
+  statement, 62 non coperti — quasi tutti rami di errore secondari; il file
+  `pdf_stub.py`, ora solo uno shim di compatibilità non più importato da nessuno, è
+  l'unico a 0% e non è un problema). Lint (`ruff`) e formattazione (`black`) puliti su
+  tutti i file nuovi/modificati di questa fase.
 - Backend Fase 0-1: avviato un vero PostgreSQL locale (via `pgserver`, senza Docker),
   generata e applicata la migration Alembic iniziale, eseguiti i test automatici (pytest).
 - Backend Fase 2: migration generata e applicata su Postgres reale (14 tabelle totali,
@@ -167,7 +206,8 @@ Se emergono errori da questi comandi, vanno segnalati per una correzione mirata.
 - Repository Git locale creato con commit iniziale in questa cartella.
 
 ## Fasi successive (non ancora iniziate)
-Fase 5 (generazione documenti con AI), Fase 6 (pagamenti), Fase 7 (email transazionale),
-Fase 8 (sicurezza estesa), Fase 9 (infrastruttura/deploy), Fase 10 (performance), Fase 11
-(lancio) — da eseguire un modulo alla volta, come da preferenza espressa. Prima di iniziare
-la Fase 5 va confermata la verifica build/lint della Fase 4 (vedi nota sopra).
+Fase 6 (pagamenti — modello a 4 piani già deciso, vedi `docs/STACK_DECISIONS.md`), Fase 7
+(email transazionale), Fase 8 (sicurezza estesa), Fase 9 (infrastruttura/deploy), Fase 10
+(performance), Fase 11 (lancio) — da eseguire un modulo alla volta, come da preferenza
+espressa. Prima di considerare la Fase 5 pronta per i clienti va impostata una vera
+`ANTHROPIC_API_KEY` e vanno validati i prompt con un esperto legale (vedi nota sopra).

@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     login_rate_limit: str = "10/15minutes"
 
     anthropic_api_key: str = ""
+    # Modello usato per la generazione documenti (Fase 5). Aggiornabile da .env senza
+    # toccare il codice quando Anthropic rilascia nuove versioni.
+    anthropic_model: str = "claude-sonnet-5"
+    # Costo stimato per monitoraggio spesa (Fase 5, roadmap: "costo stimato" per chiamata).
+    # Lasciati a 0 di default: vanno impostati in .env con i prezzi reali correnti dalla
+    # pagina pricing di Anthropic, per non registrare una stima basata su cifre non
+    # verificate. A 0, il log della chiamata riporta i token ma non un costo in USD.
+    anthropic_input_cost_per_mtok: float = 0.0
+    anthropic_output_cost_per_mtok: float = 0.0
 
     # Storage locale dei PDF generati, in attesa dell'integrazione con Supabase Storage
     # (Fase 5/6). Directory ignorata da git (vedi .gitignore) perché contiene solo output

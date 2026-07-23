@@ -9,15 +9,16 @@ from app.api.deps import (
     require_admin,
 )
 from app.core.config import get_settings
+from app.models.assessment import AssessmentResult
 from app.models.document import Document, DocumentType
 from app.schemas.document import (
     DocumentGenerateRequest,
     DocumentOut,
     DocumentUpdateRequest,
 )
+from app.services.ai_document_generator import generate_document_content
 from app.services.audit import record_audit_event
-from app.services.document_catalog import build_placeholder_content
-from app.services.pdf_stub import render_placeholder_pdf
+from app.services.pdf_renderer import render_document_pdf
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -86,9 +87,11 @@ def generate_document(
 ) -> DocumentOut:
     """Genera una nuova versione del documento richiesto.
 
-    In questa fase il contenuto è segnaposto strutturato (vedi `document_catalog`): il
-    motore AI che scrive il contenuto vero arriva in Fase 5. Ogni chiamata crea una nuova
-    versione, non sovrascrive le precedenti (stesso principio degli assessment)."""
+    Il contenuto è scritto dall'API Claude quando `ANTHROPIC_API_KEY` è configurata (Fase
+    5); altrimenti (o se la chiamata AI fallisce) ricade sul contenuto segnaposto
+    strutturato di `document_catalog`, così l'endpoint non fallisce mai per un problema
+    lato AI. Ogni chiamata crea una nuova versione, non sovrascrive le precedenti (stesso
+    principio degli assessment)."""
     if payload.doc_type not in DocumentType._value2member_map_:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -107,10 +110,25 @@ def generate_document(
     )
     next_version = (last_version.version + 1) if last_version else 1
 
+    latest_assessment = (
+        db.query(AssessmentResult)
+        .filter(AssessmentResult.organization_id == membership.organization.id)
+        .order_by(AssessmentResult.created_at.desc())
+        .first()
+    )
+    context = {}
+    if latest_assessment is not None:
+        context["nis2_category"] = latest_assessment.nis2_category.value
+        context["cra_in_scope"] = latest_assessment.cra_in_scope
+
+    content, ai_meta = generate_document_content(
+        doc_type, membership.organization, context
+    )
+
     document = Document(
         organization_id=membership.organization.id,
         doc_type=doc_type,
-        content=build_placeholder_content(doc_type),
+        content=content,
         version=next_version,
         created_by=membership.user.id,
     )
@@ -124,7 +142,7 @@ def generate_document(
         user_id=membership.user.id,
         organization_id=membership.organization.id,
         entity="document",
-        details={"doc_type": doc_type.value, "version": next_version},
+        details={"doc_type": doc_type.value, "version": next_version, **ai_meta},
         ip_address=request.client.host if request.client else None,
     )
     return _to_out(document)
@@ -187,14 +205,17 @@ def generate_pdf(
     db: Session = Depends(get_db),
 ) -> DocumentOut:
     """Genera un PDF reale (non simulato) a partire dal contenuto attuale del documento e
-    lo salva su storage locale, in attesa dell'integrazione con Supabase Storage (Fase
-    5/6). L'impaginazione è minimale: verrà sostituita da un motore di rendering più
-    ricco quando arriverà il contenuto vero generato dall'AI."""
+    lo salva su storage locale, in attesa dell'integrazione con Supabase Storage (Fase 6).
+    """
     document = _get_owned_document(db, membership.organization.id, document_id)
 
-    pdf_bytes = render_placeholder_pdf(
+    pdf_bytes = render_document_pdf(
         title=document.doc_type.value.replace("_", " ").title(),
+        organization_name=membership.organization.name,
         sections=document.content.get("sezioni", []),
+        version=document.version,
+        generated_at=document.created_at,
+        ai_generated=document.content.get("generato_da") == "ai",
     )
 
     settings = get_settings()

@@ -344,7 +344,14 @@ function DocumentsTab() {
             <div key={doc.id} className="rounded-lg border border-slate-200 bg-white p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium text-slate-800">{documentTypeLabel(doc.doc_type)}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-slate-800">{documentTypeLabel(doc.doc_type)}</p>
+                    {doc.content.generato_da === "ai" ? (
+                      <Badge label="Generato con AI" variant="info" />
+                    ) : (
+                      <Badge label="Segnaposto" variant="neutral" />
+                    )}
+                  </div>
                   <p className="text-xs text-slate-400">
                     Versione {doc.version} · generato il {formatDateTime(doc.created_at)}
                   </p>
@@ -384,6 +391,11 @@ function DocumentsTab() {
 
               {expandedId === doc.id && (
                 <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4">
+                  {doc.content.disclaimer && (
+                    <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-800">
+                      {doc.content.disclaimer}
+                    </p>
+                  )}
                   {doc.content.sezioni.map((section, i) => (
                     <div key={i}>
                       <p className="text-sm font-semibold text-slate-700">{section.titolo}</p>

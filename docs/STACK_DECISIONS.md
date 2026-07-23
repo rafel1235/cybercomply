@@ -37,3 +37,36 @@ d'ambiente usano placeholder in `.env.example`.
 ## Package manager
 pnpm workspaces per la parte JS/TS (`apps/web`, `packages/shared`). Il backend Python usa un
 virtualenv/`requirements.txt` separato in `apps/api`, dato che non fa parte dei workspace JS.
+
+## Modello di prezzo (deciso in Fase 4, per l'implementazione in Fase 6)
+Il titolare ha scelto il modello a 4 piani semplici ad abbonamento mensile, senza il doppio
+binario Adeguamento una tantum/Mantenimento esplorato in un documento precedente. Fonte
+autorevole e definitiva: `NUOVI PIANI.pdf` (Giugno 2026), che sostituisce sia il Business
+Plan sia "Piani di Abbonamento.pdf"/"Modello di Ricorrenza.pdf" su questo tema. Nessun
+pacchetto con scadenza di accesso a 90/120 giorni: solo abbonamenti ricorrenti, upgrade/
+downgrade in qualsiasi momento.
+
+| Caratteristica | Free | Essential | Business | Enterprise |
+|---|---|---|---|---|
+| Prezzo mensile | €0 | €99 | €299 | da €800 (contratto custom) |
+| Assessment | Sì | Sì | Sì | Sì |
+| Compliance Tracker | 3 misure, sola lettura | 15 misure, editabile | 15 misure | 15 misure |
+| Documenti AI/mese | No (0) | 5 | Illimitati | Illimitati |
+| Incident Reporting | No | Sì | Sì | Sì |
+| Supply Chain Risk | No | No | Illimitato | Illimitato |
+| Utenti | 1 | 1 | 5 | Illimitati |
+| Report management | No | No | Trimestrale | Trimestrale + custom |
+| Supporto | Nessuno | Email 48h | Email 24h | Account manager dedicato |
+| White-label / API | No | No | No | Sì |
+
+Trial: ogni nuovo account può attivare 14 giorni di prova gratuita sul piano Essential
+(nessuna carta richiesta); allo scadere, downgrade automatico a Free con i dati esistenti
+mantenuti in sola lettura fino a un eventuale upgrade a pagamento.
+
+Il `Plan` enum già presente in `app/models/subscription.py` (free/essential/business/
+enterprise) resta coerente e non richiede modifiche strutturali; il `SubscriptionStatus`
+enum (trialing/active/past_due/canceled) copre già il ciclo trial→attivo→scaduto. Da
+aggiungere in Fase 6: i contatori/limiti d'uso per piano (documenti generati nel mese
+corrente, numero utenti, numero fornitori) e il gating dei moduli Incident Reporting/Supply
+Chain in base al piano attivo dell'organizzazione — oggi nessuno di questi controlli esiste
+nel codice.
