@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -212,3 +213,36 @@ def generate_pdf(
     db.refresh(document)
 
     return _to_out(document)
+
+
+@router.get("/{document_id}/pdf")
+def download_pdf(
+    document_id: str,
+    membership: CurrentMembership = Depends(get_current_membership),
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    """Scarica i byte reali del PDF già generato (POST .../pdf crea/rigenera il file,
+    questo endpoint lo restituisce). Separato dalla generazione così il frontend può
+    offrire un link di download diretto senza rigenerare il PDF ad ogni click."""
+    document = _get_owned_document(db, membership.organization.id, document_id)
+    if not document.pdf_url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PDF non ancora generato per questo documento: chiama prima "
+            "POST /documents/{id}/pdf",
+        )
+
+    settings = get_settings()
+    relative_path = document.pdf_url.removeprefix("local://")
+    file_path = settings.local_storage_path / relative_path
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File PDF non trovato su disco: rigeneralo con POST /documents/{id}/pdf",
+        )
+
+    return FileResponse(
+        file_path,
+        media_type="application/pdf",
+        filename=f"{document.doc_type.value}_v{document.version}.pdf",
+    )

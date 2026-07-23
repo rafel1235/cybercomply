@@ -17,16 +17,11 @@ const SETTINGS_ITEMS = [
   { href: "/settings/team", label: "Team" },
 ];
 
-/**
- * I 4 moduli (Assessment, Compliance Tracker, Incident Reporting, Supply Chain) sono
- * collegati qui come voci di navigazione ma le relative pagine arrivano in Fase 4:
- * questo modulo copre solo Fase 0-1 (setup + autenticazione).
- */
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex w-60 flex-col gap-6 border-r border-slate-200 bg-white p-4">
+    <nav className="flex w-60 flex-col gap-6 border-r border-slate-200 bg-white p-4 print:hidden">
       <div className="text-lg font-bold text-brand-dark">
         CyberComply<span className="text-brand-amber">IT</span>
       </div>

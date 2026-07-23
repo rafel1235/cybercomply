@@ -19,7 +19,7 @@ export function Header({
   }
 
   return (
-    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
+    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 print:hidden">
       <div className="text-sm font-medium text-slate-700">
         {organizationName ?? "Nessuna organizzazione associata"}
       </div>

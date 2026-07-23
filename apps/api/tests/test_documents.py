@@ -126,3 +126,32 @@ def test_generate_pdf_produces_real_pdf_bytes(client):
     file_path = get_settings().local_storage_path / relative_path
     assert file_path.exists()
     assert file_path.read_bytes().startswith(b"%PDF-1.4")
+
+
+def test_download_pdf_before_generation_returns_404(client):
+    token, _ = _sync(client, "doc-pdf-early@cybercomplyit.it", "Org Doc Pdf Early Srl")
+    generated = client.post(
+        "/api/v1/documents/generate",
+        json={"doc_type": "politica_crittografia"},
+        headers=_auth(token),
+    ).json()
+
+    resp = client.get(f"/api/v1/documents/{generated['id']}/pdf", headers=_auth(token))
+    assert resp.status_code == 404
+
+
+def test_download_pdf_returns_real_bytes(client):
+    token, _ = _sync(
+        client, "doc-pdf-download@cybercomplyit.it", "Org Doc Pdf Download Srl"
+    )
+    generated = client.post(
+        "/api/v1/documents/generate",
+        json={"doc_type": "piano_bcp"},
+        headers=_auth(token),
+    ).json()
+    client.post(f"/api/v1/documents/{generated['id']}/pdf", headers=_auth(token))
+
+    resp = client.get(f"/api/v1/documents/{generated['id']}/pdf", headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content.startswith(b"%PDF-1.4")

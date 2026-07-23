@@ -81,6 +81,52 @@ Roadmap Tecnica CyberComplyIT.
       positive → conforme, nessuna → non conforme, altrimenti parziale) e sincronizzato
       sia sul questionario sia sulla scheda fornitore.
 
+## Fase 4 — Frontend completo dei moduli — ✅ codice completo, verifica build lato utente da confermare
+- [x] Setup: React Query (`QueryClientProvider`), sistema di toast globale (senza librerie
+      esterne), hook `useApi()` (token Supabase sempre fresco), `ApiError` tipizzato con
+      status HTTP, componenti UI riutilizzabili (`Badge`, `Skeleton`, `EmptyState`)
+- [x] Endpoint `GET /audit-log` (dedicato alla dashboard: ultime azioni, limite 1-100,
+      isolato per organizzazione)
+- [x] Dashboard principale: indice di conformità, stato NIS2/CRA, prossime scadenze
+      normative reali (estratte dalla Guida al Servizio), grafico andamento (SVG scritto a
+      mano, nessuna libreria di charting), ultime azioni registrate
+- [x] Modulo Assessment: form di classificazione, risultato con badge e motivazione,
+      storico completo
+- [x] Modulo Compliance Tracker: le 15 misure raggruppate in 6 categorie, filtro per stato,
+      note per misura, cronologia per singola misura dall'audit log
+- [x] Modulo Documenti: generazione, versionamento, anteprima, download PDF reale (nuovo
+      endpoint `GET /documents/:id/pdf`), report di conformità stampabile (`window.print()`)
+- [x] Modulo Incident Reporting: apertura incidente, timer live dall'apertura, checklist
+      scadenze di notifica (NIS2 24h/72h/30gg + CRA-ENISA 24h/72h) con stato
+      inviata/scaduta/in attesa, mini-form di registrazione notifica per fase, generatore di
+      bozza email per CSIRT Italia/ENISA (copia negli appunti), chiusura incidente, export
+      stampabile
+- [x] Modulo Supply Chain: CRUD fornitori con criticità/stato, invio questionario con link
+      pubblico univoco (token, nessun account richiesto), pagina pubblica
+      `/questionario/:token` per la compilazione (fuori dal middleware di autenticazione),
+      calcolo dello stato di conformità sincronizzato su questionario e scheda fornitore
+
+**Nota sulla verifica di questa fase**: durante lo sviluppo, un tentativo di installare una
+libreria (poi rimossa, i grafici sono infatti SVG scritti a mano) ha corrotto
+`apps/web/node_modules` nella cartella reale sincronizzata (symlink interni con errori di
+I/O). La cartella di lavoro sandbox usata per scrivere questo modulo non riesce a
+reinstallare pacchetti npm/pnpm entro i tempi disponibili — il problema è confinato del
+tutto a `node_modules` (rigenerabile, nessun codice o dato utente a rischio). Il codice di
+questo modulo è stato quindi scritto e rivisto manualmente (tipi TypeScript, entità JSX,
+import) ma **non ancora verificato con `next build` / `next lint` / `tsc --noEmit`** in
+questa sessione. Per completare la verifica, da PowerShell nella cartella del progetto:
+
+```powershell
+cd apps/web
+Remove-Item -Recurse -Force node_modules
+cd ..\..
+pnpm install
+pnpm --filter @cybercomplyit/web build
+pnpm --filter @cybercomplyit/web lint
+```
+
+Se emergono errori da questi comandi, vanno segnalati per una correzione mirata.
+
 ## Verifica eseguita (non solo scritta: testata davvero)
 - Backend Fase 0-1: avviato un vero PostgreSQL locale (via `pgserver`, senza Docker),
   generata e applicata la migration Alembic iniziale, eseguiti i test automatici (pytest).
@@ -121,8 +167,7 @@ Roadmap Tecnica CyberComplyIT.
 - Repository Git locale creato con commit iniziale in questa cartella.
 
 ## Fasi successive (non ancora iniziate)
-Fase 4 (frontend completo dei 4 moduli: assessment, compliance, documenti, incidenti,
-fornitori), Fase 5 (generazione documenti con AI), Fase 6 (pagamenti), Fase 7 (email
-transazionale), Fase 8 (sicurezza estesa), Fase 9 (infrastruttura/deploy), Fase 10
-(performance), Fase 11 (lancio) — da eseguire un modulo alla volta, come da preferenza
-espressa.
+Fase 5 (generazione documenti con AI), Fase 6 (pagamenti), Fase 7 (email transazionale),
+Fase 8 (sicurezza estesa), Fase 9 (infrastruttura/deploy), Fase 10 (performance), Fase 11
+(lancio) — da eseguire un modulo alla volta, come da preferenza espressa. Prima di iniziare
+la Fase 5 va confermata la verifica build/lint della Fase 4 (vedi nota sopra).

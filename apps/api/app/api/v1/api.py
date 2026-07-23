@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.routes import (
     assessments,
+    audit,
     auth,
     compliance,
     documents,
@@ -22,3 +23,4 @@ api_router.include_router(documents.router)
 api_router.include_router(incidents.router)
 api_router.include_router(suppliers.router)
 api_router.include_router(public_questionnaires.router)
+api_router.include_router(audit.router)
