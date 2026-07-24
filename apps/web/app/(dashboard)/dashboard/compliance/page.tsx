@@ -14,7 +14,9 @@ import {
 } from "@/lib/complianceCategories";
 import { DOCUMENT_TYPES, documentTypeLabel } from "@/lib/documentLabels";
 import { formatDateTime } from "@/lib/format";
+import { PLAN_LABELS } from "@/lib/planLabels";
 import { useAuditLog } from "@/lib/queries/auditLog";
+import { useSubscription } from "@/lib/queries/billing";
 import {
   useComplianceMeasures,
   useComplianceScore,
@@ -90,7 +92,12 @@ function MeasuresTab() {
   const scoreQuery = useComplianceScore();
   const updateMutation = useUpdateComplianceMeasure();
   const auditQuery = useAuditLog(100);
+  const subscriptionQuery = useSubscription();
   const { showToast } = useToast();
+
+  const readOnly = subscriptionQuery.data
+    ? !subscriptionQuery.data.entitlements.compliance_measures_editable
+    : false;
 
   const [categoryFilter, setCategoryFilter] = useState("Tutte");
   const [statusFilter, setStatusFilter] = useState("Tutti");
@@ -126,6 +133,16 @@ function MeasuresTab() {
 
   return (
     <div className="flex flex-col gap-4">
+      {readOnly && (
+        <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+          Il piano Free mostra le prime 3 misure in sola lettura, come assaggio del
+          tracker.{" "}
+          <a href="/settings/billing" className="font-medium text-brand-blue hover:underline">
+            Passa a Essential
+          </a>{" "}
+          per sbloccare tutte le 15 misure e poterle modificare.
+        </p>
+      )}
       {scoreQuery.data && (
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-sm text-slate-500">Punteggio attuale</p>
@@ -187,7 +204,8 @@ function MeasuresTab() {
                 <select
                   value={m.status}
                   onChange={(e) => handleStatusChange(m.measure_id, e.target.value, m.note)}
-                  className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                  disabled={readOnly}
+                  className="rounded-md border border-slate-300 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
                 >
                   {Object.entries(MEASURE_STATUS_LABELS).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -215,7 +233,8 @@ function MeasuresTab() {
                 }
                 onBlur={() => handleNoteSave(m.measure_id, m.status)}
                 rows={2}
-                className="mt-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+                disabled={readOnly}
+                className="mt-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
               />
 
               {historyOpenFor === m.measure_id && (
@@ -254,7 +273,12 @@ function DocumentsTab() {
   const generatePdfMutation = useGenerateDocumentPdf();
   const downloadMutation = useDownloadDocumentPdf();
   const deleteMutation = useDeleteDocument();
+  const subscriptionQuery = useSubscription();
   const { showToast } = useToast();
+
+  const monthlyLimit = subscriptionQuery.data?.entitlements.max_ai_documents_per_month ?? null;
+  const generatedThisMonth = subscriptionQuery.data?.usage.documents_generated_this_month ?? 0;
+  const quotaReached = monthlyLimit !== null && generatedThisMonth >= monthlyLimit;
 
   const [selectedType, setSelectedType] = useState(DOCUMENT_TYPES[0]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -324,11 +348,24 @@ function DocumentsTab() {
         </select>
         <button
           onClick={handleGenerate}
-          disabled={generateMutation.isPending}
-          className="rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-60"
+          disabled={generateMutation.isPending || quotaReached}
+          className="rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {generateMutation.isPending ? "Generazione…" : "Genera documento"}
         </button>
+        {monthlyLimit !== null && (
+          <span className="text-xs text-slate-500">
+            {generatedThisMonth} / {monthlyLimit} documenti generati questo mese
+            {quotaReached && (
+              <>
+                {" · "}
+                <a href="/settings/billing" className="font-medium text-brand-blue hover:underline">
+                  aumenta il limite
+                </a>
+              </>
+            )}
+          </span>
+        )}
       </div>
 
       {documentsQuery.isLoading ? (

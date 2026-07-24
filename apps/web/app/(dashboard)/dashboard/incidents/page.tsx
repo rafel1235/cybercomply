@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { UpsellNotice } from "@/components/ui/UpsellNotice";
+import { ApiError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { INCIDENT_STATUS_LABELS, INCIDENT_STATUS_VARIANTS } from "@/lib/incidentLabels";
 import { useCreateIncident, useIncidents } from "@/lib/queries/incidents";
@@ -27,6 +29,11 @@ export default function IncidentsPage() {
 
   const incidentsQuery = useIncidents(statusFilter || undefined);
   const createMutation = useCreateIncident();
+
+  const blockedByPlan =
+    incidentsQuery.isError &&
+    incidentsQuery.error instanceof ApiError &&
+    incidentsQuery.error.status === 403;
 
   const filtered = useMemo(() => {
     const list = incidentsQuery.data ?? [];
@@ -57,6 +64,18 @@ export default function IncidentsPage() {
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Errore durante l'apertura", "error");
     }
+  }
+
+  if (blockedByPlan) {
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="text-2xl font-bold text-brand-dark">Gestione incidenti</h1>
+        <UpsellNotice
+          title="Modulo non incluso nel tuo piano attuale"
+          description="L'Incident Reporting (scadenze di notifica NIS2/CRA, checklist e bozze email per CSIRT/ENISA) è incluso dal piano Essential in su."
+        />
+      </div>
+    );
   }
 
   return (

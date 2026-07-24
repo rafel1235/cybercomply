@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import extract
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentMembership, get_current_membership, get_db
+from app.api.deps import (
+    CurrentMembership,
+    get_current_membership,
+    get_db,
+    require_incident_reporting,
+)
 from app.models.incident import (
     Incident,
     IncidentNotification,
@@ -21,7 +26,14 @@ from app.schemas.incident import (
 from app.services.audit import record_audit_event
 from app.services.incident_deadlines import compute_deadlines
 
-router = APIRouter(prefix="/incidents", tags=["incidents"])
+# Fase 6: l'intero modulo Incident Reporting è riservato ai piani Essential e superiori
+# (vedi entitlements.py). La dipendenza a livello di router applica il controllo a ogni
+# endpoint sotto /incidents senza doverlo ripetere in ciascuna funzione.
+router = APIRouter(
+    prefix="/incidents",
+    tags=["incidents"],
+    dependencies=[Depends(require_incident_reporting)],
+)
 
 
 def _to_out(incident: Incident) -> IncidentOut:

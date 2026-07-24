@@ -1,22 +1,39 @@
+from app.models.subscription import Plan, Subscription
 from tests.conftest import make_token
 
 
-def _sync(client, email, org_name):
+def _sync(client, db_session, email, org_name):
+    """Fase 6: il modulo fornitori (usato qui solo per generare eventi di audit di prova)
+    richiede il piano Business: l'organizzazione viene portata a Business subito dopo la
+    sincronizzazione, così questi test restano concentrati sull'audit log e non
+    sull'entitlement in sé (testato a parte in test_entitlements.py)."""
     token = make_token(email=email)
     resp = client.post(
         "/api/v1/auth/sync",
         json={"organization_name": org_name},
         headers={"Authorization": f"Bearer {token}"},
     )
-    return token, resp.json()["organizations"][0]["id"]
+    org_id = resp.json()["organizations"][0]["id"]
+
+    subscription = (
+        db_session.query(Subscription)
+        .filter(Subscription.organization_id == org_id)
+        .first()
+    )
+    subscription.plan = Plan.business
+    db_session.commit()
+
+    return token, org_id
 
 
 def _auth(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_audit_log_lists_recent_actions_most_recent_first(client):
-    token, _ = _sync(client, "audit-list@cybercomplyit.it", "Org Audit List Srl")
+def test_audit_log_lists_recent_actions_most_recent_first(client, db_session):
+    token, _ = _sync(
+        client, db_session, "audit-list@cybercomplyit.it", "Org Audit List Srl"
+    )
     client.post(
         "/api/v1/suppliers", json={"name": "Fornitore Uno"}, headers=_auth(token)
     )
@@ -35,8 +52,10 @@ def test_audit_log_lists_recent_actions_most_recent_first(client):
     assert timestamps == sorted(timestamps, reverse=True)
 
 
-def test_audit_log_respects_limit(client):
-    token, _ = _sync(client, "audit-limit@cybercomplyit.it", "Org Audit Limit Srl")
+def test_audit_log_respects_limit(client, db_session):
+    token, _ = _sync(
+        client, db_session, "audit-limit@cybercomplyit.it", "Org Audit Limit Srl"
+    )
     for i in range(5):
         client.post(
             "/api/v1/suppliers", json={"name": f"Fornitore {i}"}, headers=_auth(token)
@@ -47,9 +66,13 @@ def test_audit_log_respects_limit(client):
     assert len(resp.json()) == 2
 
 
-def test_audit_log_scoped_to_organization(client):
-    token_a, _ = _sync(client, "audit-org-a@cybercomplyit.it", "Org Audit A Srl")
-    token_b, _ = _sync(client, "audit-org-b@cybercomplyit.it", "Org Audit B Srl")
+def test_audit_log_scoped_to_organization(client, db_session):
+    token_a, _ = _sync(
+        client, db_session, "audit-org-a@cybercomplyit.it", "Org Audit A Srl"
+    )
+    token_b, _ = _sync(
+        client, db_session, "audit-org-b@cybercomplyit.it", "Org Audit B Srl"
+    )
     client.post(
         "/api/v1/suppliers", json={"name": "Fornitore Org A"}, headers=_auth(token_a)
     )

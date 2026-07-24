@@ -155,7 +155,89 @@ un paio di generazioni reali prima di considerare la Fase 5 pronta per i clienti
 particolare la qualità dei prompt, che la roadmap chiede di validare anche con un esperto
 legale prima del lancio commerciale).
 
+## Fase 6 — Pagamenti e piani — ✅ completata e verificata
+- [x] Modello dei 4 piani (`docs/NUOVI PIANI.pdf`, tabella autoritativa) centralizzato in
+      `app/services/entitlements.py`: una sola fonte di verità (`PLAN_ENTITLEMENTS`) per
+      utenti massimi, documenti AI/mese, limite e modificabilità delle misure di
+      conformità, Incident Reporting, Supply Chain, report trimestrali, white-label, API.
+- [x] Ogni nuova organizzazione parte automaticamente con un trial Essential di 14 giorni
+      senza carta di credito richiesta (`auth/sync`); allo scadere il downgrade a Free è
+      "lazy" (calcolato alla richiesta successiva, nessun cron — l'infrastruttura per job
+      schedulati arriva in Fase 9), e non cancella mai i dati: restano in sola lettura.
+- [x] Gating applicato ai moduli esistenti: Incident Reporting e Supply Chain bloccati a
+      livello di intero router (dependency su `APIRouter`) per i piani che non li
+      includono; quota documenti AI/mese calcolata contando le righe generate dall'inizio
+      del mese solare (nessun contatore separato da mantenere); Compliance Tracker
+      limitato alle prime 3 misure e in sola lettura su Free; limite posti (`max_users`)
+      verificato su ogni invito, contando membri attuali + inviti pendenti non scaduti.
+      Il link pubblico di un questionario fornitore già inviato resta sempre valido anche
+      se il piano dell'organizzazione cambia in seguito.
+- [x] Integrazione Stripe (`app/services/billing.py`): Customer Stripe creato alla prima
+      necessità e riusato, Checkout Session (abbonamento Essential/Business — Enterprise
+      resta su contratto personalizzato, non acquistabile in autonomia), Customer Portal
+      per gestione autonoma dell'abbonamento, webhook con verifica firma HMAC locale e
+      gestione dei 5 eventi rilevanti (`checkout.session.completed`,
+      `invoice.payment_succeeded`, `invoice.payment_failed`,
+      `customer.subscription.deleted`, `customer.subscription.updated` per upgrade/
+      downgrade fatti dal cliente stesso dal portale). Come per l'AI in Fase 5: se Stripe
+      non è configurato le funzioni restituiscono un errore chiaro (400), mai un 500.
+- [x] Endpoint `GET /billing/subscription` (piano/stato/trial/rinnovo/entitlement/utilizzo
+      corrente), `POST /billing/checkout`, `POST /billing/portal` (entrambi solo admin),
+      `POST /billing/webhook` (pubblico, verificato via firma Stripe, non tramite JWT).
+- [x] Frontend — pagina `settings/billing`: piano attuale, stato (badge in prova/attivo/
+      pagamento non riuscito/annullato), countdown del trial, prossimo rinnovo, utilizzo
+      corrente (documenti/mese e utenti rispetto ai limiti), confronto dei 4 piani con
+      pulsante "Passa a…" (Essential/Business, via Stripe Checkout) e "Contattaci" per
+      Enterprise, pulsante "Gestisci abbonamento" (Customer Portal Stripe) quando esiste
+      già un abbonamento a pagamento. Gestisce anche il redirect di ritorno da Stripe
+      (`?checkout=success|cancelled`).
+- [x] Gating visivo nel resto della UI: voci di navigazione Incident Reporting/Supply
+      Chain contrassegnate "UPGRADE" quando non incluse nel piano (il link resta
+      cliccabile: la pagina di destinazione mostra l'upsell completo se il backend
+      risponde 403); badge del piano e countdown del trial nell'header; Compliance
+      Tracker mostra un avviso e disabilita modifica/note quando il piano è in sola
+      lettura (Free); tab Documenti mostra il contatore "X / Y generati questo mese" e
+      disabilita il pulsante di generazione al raggiungimento della quota; pagina Team
+      riscritta per usare i veri endpoint `/organization/*` (prima puntava a un endpoint
+      Fase 1 non più esistente, quindi ogni invito falliva silenziosamente: bug
+      preesistente scoperto e corretto in questa fase) con messaggio esplicito e link
+      alla pagina Fatturazione quando si raggiunge il limite di posti del piano.
+
+**Nota importante**: come per `ANTHROPIC_API_KEY` in Fase 5, Stripe non è mai stato
+chiamato con credenziali reali in questa sessione — tutte le chiamate SDK sono state
+sostituite con doppi di test (`monkeypatch`), sia per non dipendere da credenziali reali
+sia per non generare veri addebiti durante i test automatici. Prima del lancio commerciale
+vanno impostate le chiavi reali (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+`STRIPE_PRICE_ID_ESSENTIAL`, `STRIPE_PRICE_ID_BUSINESS`) in `apps/api/.env` e va eseguito
+almeno un ciclo completo di checkout/webhook contro l'ambiente di test di Stripe.
+
 ## Verifica eseguita (non solo scritta: testata davvero)
+- Backend Fase 6: migration riapplicata da zero su Postgres reale (colonna
+  `stripe_customer_id` + indice), **132/132 test automatici passati** (86 precedenti + 46
+  nuovi: entitlements per piano, trial e relativo downgrade automatico, integrazione
+  Stripe interamente mockata — customer, checkout, portale, webhook con firma valida/non
+  valida/segreto assente, i 5 eventi gestiti più i casi "customer sconosciuto" ed "evento
+  non gestito" — ed enforcement dei limiti nei moduli Documenti/Compliance/Incident
+  Reporting/Supply Chain/Organizzazione). Tre file di test preesistenti (fornitori,
+  inviti organizzazione, audit log) sono stati aggiornati per portare esplicitamente
+  l'organizzazione di test al piano Business dove necessario, dato che ora ogni nuova
+  organizzazione parte in trial Essential (non più senza restrizioni come prima di questa
+  fase) — con test dedicati aggiunti per verificare anche il comportamento bloccato.
+  Copertura: **96%** (1842 statement, 73 non coperti). Lint (`ruff`) e formattazione
+  (`black`) puliti su tutti i file nuovi/modificati di questa fase.
+- Frontend Fase 6: verificato con un'installazione pulita di `pnpm` in un ambiente Linux
+  dedicato (per evitare il problema di `node_modules` sincronizzato incontrato in Fase 4),
+  cosa che ha permesso — a differenza della Fase 4 — di eseguire anche `next build` in
+  proprio invece di doverlo delegare al titolare. **`tsc --noEmit` pulito** (corretto anche
+  un errore di tipo preesistente e non collegato a questa fase: al campo `disclaimer` di
+  `DocumentContent`, già usato dalla UI dei documenti dalla Fase 5, mancava la
+  dichiarazione TypeScript). **`next lint` pulito, nessun warning**. **`next build`
+  completata con successo**, tutte le 18 route generate (17 precedenti + la nuova
+  `/settings/billing`), type-checking incluso nella build senza errori. Corretto inoltre un
+  bug preesistente scoperto durante questo lavoro: `settings/team` chiamava un endpoint di
+  invito della Fase 1 (`/auth/organizations/:id/invites`) mai più esistito dopo il
+  refactor della Fase 3, quindi ogni invito falliva; ora usa il vero endpoint
+  `/organization/invites` con elenco membri, rimozione e messaggio di limite posti.
 - Backend Fase 5: migration riapplicate da zero su Postgres reale, **86/86 test
   automatici passati** (65 precedenti + 21 nuovi: retry/backoff/timeout del client AI con
   chiamate HTTP mockate, fallback al segnaposto in tutti i casi previsti — non configurata,
@@ -206,8 +288,11 @@ legale prima del lancio commerciale).
 - Repository Git locale creato con commit iniziale in questa cartella.
 
 ## Fasi successive (non ancora iniziate)
-Fase 6 (pagamenti — modello a 4 piani già deciso, vedi `docs/STACK_DECISIONS.md`), Fase 7
-(email transazionale), Fase 8 (sicurezza estesa), Fase 9 (infrastruttura/deploy), Fase 10
-(performance), Fase 11 (lancio) — da eseguire un modulo alla volta, come da preferenza
-espressa. Prima di considerare la Fase 5 pronta per i clienti va impostata una vera
-`ANTHROPIC_API_KEY` e vanno validati i prompt con un esperto legale (vedi nota sopra).
+Fase 7 (email transazionale — serve anche a completare davvero l'invio degli inviti team e
+delle conferme di registrazione, per ora solo salvati/loggati), Fase 8 (sicurezza estesa),
+Fase 9 (infrastruttura/deploy — anche per spostare il downgrade trial→Free su un cron reale
+invece del calcolo lazy attuale), Fase 10 (performance), Fase 11 (lancio) — da eseguire un
+modulo alla volta, come da preferenza espressa. Prima del lancio commerciale vanno anche:
+impostata una vera `ANTHROPIC_API_KEY` e validati i prompt con un esperto legale (Fase 5);
+impostate le chiavi Stripe reali ed eseguito un ciclo di checkout/webhook contro il suo
+ambiente di test (Fase 6).

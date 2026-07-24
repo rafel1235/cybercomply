@@ -11,6 +11,7 @@ export interface DocumentSection {
 export interface DocumentContent {
   generato_da?: string;
   nota?: string;
+  disclaimer?: string;
   sezioni: DocumentSection[];
 }
 
@@ -39,6 +40,9 @@ export function useGenerateDocument() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
       queryClient.invalidateQueries({ queryKey: ["audit-log"] });
+      // La quota mensile mostrata nella pagina Fatturazione dipende dal conteggio dei
+      // documenti generati questo mese: deve aggiornarsi subito dopo ogni generazione.
+      queryClient.invalidateQueries({ queryKey: ["billing"] });
     },
   });
 }

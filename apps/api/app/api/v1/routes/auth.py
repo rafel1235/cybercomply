@@ -9,9 +9,12 @@ from app.core.config import get_settings
 from app.core.rate_limit import limiter
 from app.core.security import SupabaseUser
 from app.models.organization import Organization, OrganizationMember, OrganizationRole
+from app.models.subscription import Plan, Subscription, SubscriptionStatus
 from app.models.user import User
 from app.schemas.auth import MeResponse, OrganizationOut, SyncUserRequest, UserOut
 from app.services.audit import record_audit_event
+
+TRIAL_DURATION_DAYS = 14
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -38,7 +41,9 @@ def sync_user(
     user = db.get(User, supabase_user.id)
     is_new_user = user is None
     if user is None:
-        user = User(id=supabase_user.id, email=supabase_user.email, full_name=payload.full_name)
+        user = User(
+            id=supabase_user.id, email=supabase_user.email, full_name=payload.full_name
+        )
         db.add(user)
     else:
         user.email = supabase_user.email
@@ -61,6 +66,19 @@ def sync_user(
             joined_at=datetime.now(timezone.utc),
         )
         db.add(membership)
+
+        # Fase 6: ogni nuova organizzazione parte con un trial di 14 giorni sul piano
+        # Essential, senza richiedere una carta di credito (NUOVI PIANI.pdf, §7.1). Allo
+        # scadere del trial, l'entitlement service degrada automaticamente a Free (lazy,
+        # nessun cron necessario) mantenendo i dati esistenti in sola lettura.
+        subscription = Subscription(
+            organization_id=organization.id,
+            plan=Plan.essential,
+            status=SubscriptionStatus.trialing,
+            trial_ends_at=datetime.now(timezone.utc)
+            + timedelta(days=TRIAL_DURATION_DAYS),
+        )
+        db.add(subscription)
         db.commit()
 
         record_audit_event(
@@ -95,7 +113,9 @@ def _build_me_response(db: Session, user: User) -> MeResponse:
     memberships = user.memberships
     org_ids = [m.organization_id for m in memberships]
     organizations = (
-        db.query(Organization).filter(Organization.id.in_(org_ids)).all() if org_ids else []
+        db.query(Organization).filter(Organization.id.in_(org_ids)).all()
+        if org_ids
+        else []
     )
     return MeResponse(
         user=UserOut.model_validate(user),

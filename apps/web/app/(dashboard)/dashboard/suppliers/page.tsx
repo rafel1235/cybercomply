@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { UpsellNotice } from "@/components/ui/UpsellNotice";
+import { ApiError } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
 import {
   useCreateQuestionnaire,
@@ -105,6 +107,23 @@ export default function SuppliersPage() {
   }
 
   const suppliers = suppliersQuery.data ?? [];
+
+  const blockedByPlan =
+    suppliersQuery.isError &&
+    suppliersQuery.error instanceof ApiError &&
+    suppliersQuery.error.status === 403;
+
+  if (blockedByPlan) {
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="text-2xl font-bold text-brand-dark">Supply Chain</h1>
+        <UpsellNotice
+          title="Modulo non incluso nel tuo piano attuale"
+          description="Il monitoraggio dei fornitori (questionari di sicurezza, criticità, stato di conformità) è incluso dal piano Business in su."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

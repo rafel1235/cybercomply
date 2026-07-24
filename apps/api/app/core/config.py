@@ -46,6 +46,25 @@ class Settings(BaseSettings):
     # rigenerabile, non sorgenti.
     local_storage_dir: str = "storage"
 
+    # --- Stripe (Fase 6 — pagamenti e piani) ---
+    stripe_secret_key: str = ""
+    stripe_publishable_key: str = ""
+    # Segreto per verificare la firma dei webhook Stripe (obbligatorio in produzione:
+    # senza verifica, chiunque potrebbe fingere di essere Stripe e attivare piani gratis).
+    stripe_webhook_secret: str = ""
+    # ID dei prezzi ricorrenti creati sulla dashboard Stripe. Enterprise non ha un prezzo
+    # self-service (roadmap: "Enterprise (contattaci)"), quindi non serve un price id qui.
+    stripe_price_id_essential: str = ""
+    stripe_price_id_business: str = ""
+    # Base per le redirect URL di Checkout/Billing Portal.
+    frontend_base_url: str = "http://localhost:3000"
+
+    @property
+    def stripe_configured(self) -> bool:
+        return bool(self.stripe_secret_key) and not self.stripe_secret_key.startswith(
+            "replace-with"
+        )
+
     @property
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]

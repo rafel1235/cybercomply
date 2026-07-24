@@ -9,6 +9,7 @@ from app.api.deps import (
     get_current_membership,
     get_db,
     require_admin,
+    require_supply_chain,
 )
 from app.models.supplier import (
     Supplier,
@@ -24,7 +25,15 @@ from app.schemas.supplier import (
 )
 from app.services.audit import record_audit_event
 
-router = APIRouter(prefix="/suppliers", tags=["suppliers"])
+# Fase 6: il modulo Supply Chain Risk è riservato ai piani Business/Enterprise (vedi
+# entitlements.py). Il link pubblico del questionario (public_questionnaires.py) resta
+# volutamente fuori da questo router e non gated: un fornitore che ha già ricevuto un
+# link deve poterlo compilare anche se l'organizzazione cambia piano nel frattempo.
+router = APIRouter(
+    prefix="/suppliers",
+    tags=["suppliers"],
+    dependencies=[Depends(require_supply_chain)],
+)
 
 
 def _to_out(supplier: Supplier) -> SupplierOut:

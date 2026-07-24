@@ -1,22 +1,40 @@
+from app.models.subscription import Plan, Subscription
 from tests.conftest import make_token
 
 
-def _sync(client, email, org_name):
+def _sync(client, db_session, email, org_name):
+    """Fase 6: il modulo Supply Chain è riservato ai piani Business/Enterprise, mentre il
+    trial automatico alla registrazione è su Essential (vedi routes/auth.py). Questi test
+    riguardano proprio il modulo fornitori, quindi portano l'organizzazione al piano
+    Business subito dopo la sincronizzazione — il gating in sé è testato a parte in
+    test_entitlements.py."""
     token = make_token(email=email)
     resp = client.post(
         "/api/v1/auth/sync",
         json={"organization_name": org_name},
         headers={"Authorization": f"Bearer {token}"},
     )
-    return token, resp.json()["organizations"][0]["id"]
+    org_id = resp.json()["organizations"][0]["id"]
+
+    subscription = (
+        db_session.query(Subscription)
+        .filter(Subscription.organization_id == org_id)
+        .first()
+    )
+    subscription.plan = Plan.business
+    db_session.commit()
+
+    return token, org_id
 
 
 def _auth(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_create_supplier_defaults_to_non_valutato(client):
-    token, _ = _sync(client, "sup-create@cybercomplyit.it", "Org Supplier Create Srl")
+def test_create_supplier_defaults_to_non_valutato(client, db_session):
+    token, _ = _sync(
+        client, db_session, "sup-create@cybercomplyit.it", "Org Supplier Create Srl"
+    )
     resp = client.post(
         "/api/v1/suppliers",
         json={
@@ -32,8 +50,10 @@ def test_create_supplier_defaults_to_non_valutato(client):
     assert body["criticality"] == "alta"
 
 
-def test_create_supplier_invalid_criticality_rejected(client):
-    token, _ = _sync(client, "sup-invalid@cybercomplyit.it", "Org Supplier Invalid Srl")
+def test_create_supplier_invalid_criticality_rejected(client, db_session):
+    token, _ = _sync(
+        client, db_session, "sup-invalid@cybercomplyit.it", "Org Supplier Invalid Srl"
+    )
     resp = client.post(
         "/api/v1/suppliers",
         json={"name": "Fornitore X", "criticality": "altissima"},
@@ -42,8 +62,10 @@ def test_create_supplier_invalid_criticality_rejected(client):
     assert resp.status_code == 422
 
 
-def test_list_and_get_supplier(client):
-    token, _ = _sync(client, "sup-list@cybercomplyit.it", "Org Supplier List Srl")
+def test_list_and_get_supplier(client, db_session):
+    token, _ = _sync(
+        client, db_session, "sup-list@cybercomplyit.it", "Org Supplier List Srl"
+    )
     created = client.post(
         "/api/v1/suppliers", json={"name": "MSP Locale Srl"}, headers=_auth(token)
     ).json()
@@ -61,7 +83,7 @@ def test_delete_supplier_requires_admin(client, db_session):
     from app.models.user import User
 
     admin_token, org_id = _sync(
-        client, "sup-del-admin@cybercomplyit.it", "Org Supplier Del Srl"
+        client, db_session, "sup-del-admin@cybercomplyit.it", "Org Supplier Del Srl"
     )
     supplier = client.post(
         "/api/v1/suppliers",
@@ -97,8 +119,10 @@ def test_delete_supplier_requires_admin(client, db_session):
     assert allowed.status_code == 204
 
 
-def test_update_supplier_fields_and_status_sets_last_reviewed(client):
-    token, _ = _sync(client, "sup-update@cybercomplyit.it", "Org Supplier Update Srl")
+def test_update_supplier_fields_and_status_sets_last_reviewed(client, db_session):
+    token, _ = _sync(
+        client, db_session, "sup-update@cybercomplyit.it", "Org Supplier Update Srl"
+    )
     supplier = client.post(
         "/api/v1/suppliers",
         json={"name": "Fornitore da Aggiornare Srl"},
@@ -118,9 +142,12 @@ def test_update_supplier_fields_and_status_sets_last_reviewed(client):
     assert body["last_reviewed_at"] is not None
 
 
-def test_update_supplier_invalid_criticality_rejected(client):
+def test_update_supplier_invalid_criticality_rejected(client, db_session):
     token, _ = _sync(
-        client, "sup-update-invalid@cybercomplyit.it", "Org Supplier Update Invalid Srl"
+        client,
+        db_session,
+        "sup-update-invalid@cybercomplyit.it",
+        "Org Supplier Update Invalid Srl",
     )
     supplier = client.post(
         "/api/v1/suppliers",
@@ -135,9 +162,10 @@ def test_update_supplier_invalid_criticality_rejected(client):
     assert resp.status_code == 422
 
 
-def test_update_supplier_invalid_status_rejected(client):
+def test_update_supplier_invalid_status_rejected(client, db_session):
     token, _ = _sync(
         client,
+        db_session,
         "sup-update-invalid-status@cybercomplyit.it",
         "Org Supplier Update Status Srl",
     )
@@ -154,9 +182,10 @@ def test_update_supplier_invalid_status_rejected(client):
     assert resp.status_code == 422
 
 
-def test_update_supplier_not_found(client):
+def test_update_supplier_not_found(client, db_session):
     token, _ = _sync(
         client,
+        db_session,
         "sup-update-notfound@cybercomplyit.it",
         "Org Supplier Update NotFound Srl",
     )
@@ -168,9 +197,12 @@ def test_update_supplier_not_found(client):
     assert resp.status_code == 404
 
 
-def test_list_questionnaires_for_supplier(client):
+def test_list_questionnaires_for_supplier(client, db_session):
     token, _ = _sync(
-        client, "sup-listquest@cybercomplyit.it", "Org Supplier ListQuest Srl"
+        client,
+        db_session,
+        "sup-listquest@cybercomplyit.it",
+        "Org Supplier ListQuest Srl",
     )
     supplier = client.post(
         "/api/v1/suppliers",
@@ -191,8 +223,10 @@ def test_list_questionnaires_for_supplier(client):
     assert len(resp.json()) == 2
 
 
-def test_create_questionnaire_generates_unique_token(client):
-    token, _ = _sync(client, "sup-quest@cybercomplyit.it", "Org Supplier Quest Srl")
+def test_create_questionnaire_generates_unique_token(client, db_session):
+    token, _ = _sync(
+        client, db_session, "sup-quest@cybercomplyit.it", "Org Supplier Quest Srl"
+    )
     supplier = client.post(
         "/api/v1/suppliers",
         json={"name": "Fornitore Questionario Srl"},
@@ -209,8 +243,12 @@ def test_create_questionnaire_generates_unique_token(client):
     assert body["sent_at"] is not None
 
 
-def test_public_questionnaire_get_and_submit_updates_supplier_status(client):
-    token, _ = _sync(client, "sup-public@cybercomplyit.it", "Org Supplier Public Srl")
+def test_public_questionnaire_get_and_submit_updates_supplier_status(
+    client, db_session
+):
+    token, _ = _sync(
+        client, db_session, "sup-public@cybercomplyit.it", "Org Supplier Public Srl"
+    )
     supplier = client.post(
         "/api/v1/suppliers",
         json={"name": "Fornitore Pubblico Srl"},
@@ -247,8 +285,10 @@ def test_public_questionnaire_get_and_submit_updates_supplier_status(client):
     assert updated_supplier["status"] == "conforme"
 
 
-def test_public_questionnaire_partial_answers_give_parziale(client):
-    token, _ = _sync(client, "sup-partial@cybercomplyit.it", "Org Supplier Partial Srl")
+def test_public_questionnaire_partial_answers_give_parziale(client, db_session):
+    token, _ = _sync(
+        client, db_session, "sup-partial@cybercomplyit.it", "Org Supplier Partial Srl"
+    )
     supplier = client.post(
         "/api/v1/suppliers",
         json={"name": "Fornitore Parziale Srl"},
@@ -273,3 +313,18 @@ def test_public_questionnaire_partial_answers_give_parziale(client):
 def test_public_questionnaire_unknown_token_rejected(client):
     resp = client.get("/api/v1/public/questionnaires/token-inesistente")
     assert resp.status_code == 404
+
+
+def test_suppliers_blocked_on_essential_plan(client, db_session):
+    """Il trial automatico è su Essential (Fase 6): senza upgrade a Business, il modulo
+    Supply Chain deve restare bloccato con un messaggio chiaro invece di un errore generico.
+    """
+    token = make_token(email="sup-essential@cybercomplyit.it")
+    client.post(
+        "/api/v1/auth/sync",
+        json={"organization_name": "Org Supplier Essential Srl"},
+        headers=_auth(token),
+    )
+    resp = client.get("/api/v1/suppliers", headers=_auth(token))
+    assert resp.status_code == 403
+    assert "Supply Chain" in resp.json()["detail"]

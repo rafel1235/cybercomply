@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import (
     CurrentMembership,
+    get_current_entitlements,
     get_current_membership,
     get_db,
     require_admin,
@@ -17,6 +18,7 @@ from app.schemas.compliance import (
 )
 from app.services.audit import record_audit_event
 from app.services.compliance_catalog import COMPLIANCE_MEASURE_CATALOG
+from app.services.entitlements import PlanEntitlements
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
 
@@ -99,10 +101,23 @@ def _compute_score(measures: list[ComplianceMeasure]) -> ComplianceScoreOut:
 @router.get("/measures", response_model=list[ComplianceMeasureOut])
 def list_measures(
     membership: CurrentMembership = Depends(get_current_membership),
+    entitlements: PlanEntitlements = Depends(get_current_entitlements),
     db: Session = Depends(get_db),
 ) -> list[ComplianceMeasureOut]:
+    """Fase 6: il piano Free vede solo le prime N misure del catalogo (in sola lettura,
+    imposto lato PATCH — qui basta restituirne meno), come "assaggio" del tracker completo.
+    """
     measures = _ensure_catalog_provisioned(db, membership.organization.id)
-    return [_to_out(m) for m in sorted(measures, key=lambda m: m.measure_id)]
+    # L'ordine per measure_id è quello storico (Fase 3): qui si ordina invece secondo
+    # l'ordine del catalogo, così "le prime N" corrisponde a un elenco scelto
+    # deliberatamente (vedi entitlements.py) e non all'ordine alfabetico degli id.
+    catalog_order = {mid: i for i, mid in enumerate(_CATALOG_BY_ID)}
+    ordered = sorted(
+        measures, key=lambda m: catalog_order.get(m.measure_id, len(catalog_order))
+    )
+    if entitlements.compliance_measures_limit is not None:
+        ordered = ordered[: entitlements.compliance_measures_limit]
+    return [_to_out(m) for m in ordered]
 
 
 @router.patch("/measures/{measure_id}", response_model=ComplianceMeasureOut)
@@ -111,8 +126,15 @@ def update_measure(
     payload: ComplianceMeasureUpdateRequest,
     request: Request,
     membership: CurrentMembership = Depends(require_admin),
+    entitlements: PlanEntitlements = Depends(get_current_entitlements),
     db: Session = Depends(get_db),
 ) -> ComplianceMeasureOut:
+    if not entitlements.compliance_measures_editable:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Il Compliance Tracker è in sola lettura nel piano Free. Passa a "
+            "Essential o superiore per aggiornare lo stato delle misure.",
+        )
     if payload.status not in MeasureStatus._value2member_map_:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Stato non valido"

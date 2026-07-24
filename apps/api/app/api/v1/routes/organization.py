@@ -4,8 +4,18 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentMembership, get_current_membership, get_db, require_admin
-from app.models.organization import OrganizationInvite, OrganizationMember, OrganizationRole
+from app.api.deps import (
+    CurrentMembership,
+    get_current_entitlements,
+    get_current_membership,
+    get_db,
+    require_admin,
+)
+from app.models.organization import (
+    OrganizationInvite,
+    OrganizationMember,
+    OrganizationRole,
+)
 from app.models.user import User
 from app.schemas.organization import (
     InviteMemberRequest,
@@ -15,12 +25,15 @@ from app.schemas.organization import (
     OrganizationUpdateRequest,
 )
 from app.services.audit import record_audit_event
+from app.services.entitlements import PlanEntitlements
 
 router = APIRouter(prefix="/organization", tags=["organization"])
 
 
 @router.get("", response_model=OrganizationOut)
-def get_organization(membership: CurrentMembership = Depends(get_current_membership)) -> OrganizationOut:
+def get_organization(
+    membership: CurrentMembership = Depends(get_current_membership),
+) -> OrganizationOut:
     return OrganizationOut.model_validate(membership.organization)
 
 
@@ -91,7 +104,9 @@ def remove_member(
         .first()
     )
     if target is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Membro non trovato")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Membro non trovato"
+        )
 
     if target.role == OrganizationRole.admin:
         remaining_admins = (
@@ -129,11 +144,41 @@ def invite_member(
     payload: InviteMemberRequest,
     request: Request,
     membership: CurrentMembership = Depends(require_admin),
+    entitlements: PlanEntitlements = Depends(get_current_entitlements),
     db: Session = Depends(get_db),
 ) -> InviteMemberResponse:
     """Crea un invito per un collaboratore. L'invio effettivo dell'email arriva in Fase 7
     (provider email transazionale); per ora l'invito viene creato e loggato, pronto per
-    essere collegato all'invio reale."""
+    essere collegato all'invio reale.
+
+    Fase 6: il numero massimo di posti (membri già presenti + inviti non ancora scaduti,
+    per non far bastare crearne molti in attesa per aggirare il limite) dipende dal piano.
+    """
+    if entitlements.max_users is not None:
+        current_members = (
+            db.query(OrganizationMember)
+            .filter(OrganizationMember.organization_id == membership.organization.id)
+            .count()
+        )
+        pending_invites = (
+            db.query(OrganizationInvite)
+            .filter(
+                OrganizationInvite.organization_id == membership.organization.id,
+                OrganizationInvite.accepted_at.is_(None),
+                OrganizationInvite.expires_at > datetime.now(timezone.utc),
+            )
+            .count()
+        )
+        if current_members + pending_invites >= entitlements.max_users:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Il tuo piano attuale consente al massimo {entitlements.max_users} "
+                    "utenti (membri + inviti in attesa). Passa a un piano superiore per "
+                    "invitare altri collaboratori."
+                ),
+            )
+
     role = (
         OrganizationRole(payload.role)
         if payload.role in OrganizationRole._value2member_map_
@@ -163,4 +208,6 @@ def invite_member(
         ip_address=request.client.host if request.client else None,
     )
 
-    return InviteMemberResponse(invited_email=payload.email, invite_token=token, expires_at=expires_at)
+    return InviteMemberResponse(
+        invited_email=payload.email, invite_token=token, expires_at=expires_at
+    )

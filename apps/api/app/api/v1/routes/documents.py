@@ -1,9 +1,12 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
     CurrentMembership,
+    get_current_entitlements,
     get_current_membership,
     get_db,
     require_admin,
@@ -18,9 +21,26 @@ from app.schemas.document import (
 )
 from app.services.ai_document_generator import generate_document_content
 from app.services.audit import record_audit_event
+from app.services.entitlements import PlanEntitlements
 from app.services.pdf_renderer import render_document_pdf
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+
+def _documents_generated_this_month(db: Session, organization_id) -> int:
+    """Conta le generazioni del mese solare corrente: nessun contatore dedicato da
+    azzerare a fine mese, si ricalcola sempre dai record esistenti (stesso approccio già
+    usato per lo storico compliance e le scadenze incidenti)."""
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return (
+        db.query(Document)
+        .filter(
+            Document.organization_id == organization_id,
+            Document.created_at >= month_start,
+        )
+        .count()
+    )
 
 
 def _to_out(document: Document) -> DocumentOut:
@@ -83,6 +103,7 @@ def generate_document(
     payload: DocumentGenerateRequest,
     request: Request,
     membership: CurrentMembership = Depends(get_current_membership),
+    entitlements: PlanEntitlements = Depends(get_current_entitlements),
     db: Session = Depends(get_db),
 ) -> DocumentOut:
     """Genera una nuova versione del documento richiesto.
@@ -91,7 +112,25 @@ def generate_document(
     5); altrimenti (o se la chiamata AI fallisce) ricade sul contenuto segnaposto
     strutturato di `document_catalog`, così l'endpoint non fallisce mai per un problema
     lato AI. Ogni chiamata crea una nuova versione, non sovrascrive le precedenti (stesso
-    principio degli assessment)."""
+    principio degli assessment).
+
+    Fase 6: la quota mensile di documenti generabili dipende dal piano (0 per Free, 5 per
+    Essential, illimitata per Business/Enterprise — vedi `entitlements.py`)."""
+    if entitlements.max_ai_documents_per_month is not None:
+        generated_this_month = _documents_generated_this_month(
+            db, membership.organization.id
+        )
+        if generated_this_month >= entitlements.max_ai_documents_per_month:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "Hai raggiunto il limite di "
+                    f"{entitlements.max_ai_documents_per_month} documenti generabili questo "
+                    "mese con il tuo piano attuale. Passa a un piano superiore per "
+                    "generarne altri."
+                ),
+            )
+
     if payload.doc_type not in DocumentType._value2member_map_:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

@@ -4,6 +4,7 @@ from app.api.v1.routes import (
     assessments,
     audit,
     auth,
+    billing,
     compliance,
     documents,
     health,
@@ -24,3 +25,4 @@ api_router.include_router(incidents.router)
 api_router.include_router(suppliers.router)
 api_router.include_router(public_questionnaires.router)
 api_router.include_router(audit.router)
+api_router.include_router(billing.router)
