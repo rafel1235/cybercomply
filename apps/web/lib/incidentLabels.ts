@@ -4,7 +4,10 @@ export const INCIDENT_STATUS_LABELS: Record<string, string> = {
   chiuso: "Chiuso",
 };
 
-export const INCIDENT_STATUS_VARIANTS: Record<string, "success" | "warning" | "danger" | "neutral"> = {
+export const INCIDENT_STATUS_VARIANTS: Record<
+  string,
+  "success" | "warning" | "danger" | "neutral"
+> = {
   aperto: "danger",
   in_gestione: "warning",
   chiuso: "success",

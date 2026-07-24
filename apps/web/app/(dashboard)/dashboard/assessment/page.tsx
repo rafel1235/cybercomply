@@ -210,7 +210,9 @@ export default function AssessmentPage() {
               <tbody className="divide-y divide-slate-100">
                 {historyQuery.data.map((result) => (
                   <tr key={result.id}>
-                    <td className="px-4 py-2 text-slate-600">{formatDateTime(result.created_at)}</td>
+                    <td className="px-4 py-2 text-slate-600">
+                      {formatDateTime(result.created_at)}
+                    </td>
                     <td className="px-4 py-2">
                       <Badge
                         label={NIS2_BADGE[result.nis2_category].label}

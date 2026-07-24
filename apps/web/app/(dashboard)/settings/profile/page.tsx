@@ -54,9 +54,7 @@ export default function ProfileSettingsPage() {
       },
       onError: (error) =>
         setDeleteError(
-          error instanceof Error
-            ? error.message
-            : "Errore durante la cancellazione dell'account."
+          error instanceof Error ? error.message : "Errore durante la cancellazione dell'account."
         ),
     });
   }
@@ -95,9 +93,9 @@ export default function ProfileSettingsPage() {
       <section className="flex flex-col gap-3 border-t border-slate-200 pt-6">
         <h2 className="text-lg font-semibold text-brand-dark">Privacy e dati</h2>
         <p className="text-sm text-slate-600">
-          In base al GDPR (art. 20 — diritto alla portabilità dei dati) puoi scaricare in
-          qualsiasi momento una copia di tutti i tuoi dati e di quelli delle organizzazioni
-          di cui fai parte, in formato leggibile da macchina (JSON).
+          In base al GDPR (art. 20 — diritto alla portabilità dei dati) puoi scaricare in qualsiasi
+          momento una copia di tutti i tuoi dati e di quelli delle organizzazioni di cui fai parte,
+          in formato leggibile da macchina (JSON).
         </p>
         <button
           type="button"
@@ -106,9 +104,7 @@ export default function ProfileSettingsPage() {
             exportMyData.mutate(undefined, {
               onError: (error) =>
                 setMessage(
-                  error instanceof Error
-                    ? error.message
-                    : "Errore durante l'esportazione dei dati."
+                  error instanceof Error ? error.message : "Errore durante l'esportazione dei dati."
                 ),
             });
           }}
@@ -122,12 +118,12 @@ export default function ProfileSettingsPage() {
       <section className="flex flex-col gap-3 border-t border-slate-200 pt-6">
         <h2 className="text-lg font-semibold text-red-700">Zona pericolosa</h2>
         <p className="text-sm text-slate-600">
-          In base al GDPR (art. 17 — diritto alla cancellazione) puoi cancellare il tuo
-          account in qualsiasi momento. Se sei l&apos;unico membro di un&apos;organizzazione,
-          anche tutti i suoi dati (assessment, documenti, incidenti, fornitori) verranno
-          cancellati insieme al tuo account. Se ci sono altri membri, verrà rimossa solo
-          la tua iscrizione: se sei l&apos;unico amministratore dovrai prima promuoverne un
-          altro. L&apos;operazione è immediata e non reversibile.
+          In base al GDPR (art. 17 — diritto alla cancellazione) puoi cancellare il tuo account in
+          qualsiasi momento. Se sei l&apos;unico membro di un&apos;organizzazione, anche tutti i
+          suoi dati (assessment, documenti, incidenti, fornitori) verranno cancellati insieme al tuo
+          account. Se ci sono altri membri, verrà rimossa solo la tua iscrizione: se sei
+          l&apos;unico amministratore dovrai prima promuoverne un altro. L&apos;operazione è
+          immediata e non reversibile.
         </p>
 
         {!showDeleteConfirm ? (

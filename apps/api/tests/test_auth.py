@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.models.organization import OrganizationInvite
 from app.models.subscription import Plan, Subscription
+from app.models.user import User
 from app.services import email_service
 from tests.conftest import make_token
 
@@ -136,6 +137,48 @@ def test_login_event_locks_account_after_repeated_failures(client):
         json={"email": "target@cybercomplyit.it", "success": False},
     )
     assert locked_response.status_code == 423
+
+
+def test_locked_account_cannot_use_a_valid_jwt(client, db_session):
+    """Bug reale corretto in Fase 10 (audit finale): prima di questa correzione, il
+    blocco account era applicato solo da POST /auth/login-events, che gira DOPO che il
+    frontend ha già autenticato l'utente direttamente contro Supabase — un account
+    "bloccato" poteva quindi continuare a usare un JWT valido su qualunque altro
+    endpoint. Verifica che ora un utente con `locked_until` nel futuro venga rifiutato
+    (423) anche con un JWT perfettamente valido, non solo sull'endpoint di tracciamento.
+
+    Imposta `locked_until` direttamente sul DB (invece di ripetere 5 chiamate reali a
+    /auth/login-events, già coperte dal test sopra) per non consumare inutilmente il
+    budget del rate limiter IP-based condiviso con altri test in questo stesso file."""
+    token = make_token(email="locked-user@cybercomplyit.it")
+    client.post(
+        "/api/v1/auth/sync",
+        json={"organization_name": "Locked Org"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    user = (
+        db_session.query(User)
+        .filter(User.email == "locked-user@cybercomplyit.it")
+        .first()
+    )
+    user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+    db_session.commit()
+
+    # Stesso identico token JWT valido di prima: l'account risulta bloccato lato nostro
+    # DB, quindi anche un endpoint qualunque (non solo login-events) deve rifiutarlo.
+    response = client.get(
+        "/api/v1/organization", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 423
+
+    # Passato lo sblocco, lo stesso token torna valido.
+    user.locked_until = None
+    db_session.commit()
+    response_after_unlock = client.get(
+        "/api/v1/organization", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response_after_unlock.status_code == 200
 
 
 def _create_invite(

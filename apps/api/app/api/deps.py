@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -42,6 +43,20 @@ def get_current_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Utente autenticato su Supabase ma non ancora sincronizzato: "
             "chiamare prima POST /api/v1/auth/sync",
+        )
+    # Fase 1 (Fase 10 — bug reale corretto in fase di audit finale): il blocco account
+    # dopo troppi tentativi falliti veniva solo registrato da POST /auth/login-events, MAI
+    # applicato — quell'endpoint gira DOPO che il frontend ha già chiamato
+    # `supabase.auth.signInWithPassword`, che autentica direttamente contro Supabase senza
+    # sapere nulla del nostro `locked_until`. Un account "bloccato" poteva quindi comunque
+    # autenticarsi ed usare l'app normalmente. Applicato qui, sul percorso comune di ogni
+    # richiesta autenticata: un account bloccato non può più usare un JWT valido, a
+    # prescindere da come è stato ottenuto.
+    if user.locked_until is not None and user.locked_until > datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail="Account temporaneamente bloccato per troppi tentativi di accesso "
+            f"falliti. Riprova dopo {user.locked_until.isoformat()}.",
         )
     return user
 

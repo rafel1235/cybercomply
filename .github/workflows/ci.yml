@@ -24,6 +24,25 @@ on:
   pull_request:
 
 jobs:
+  secret-scan:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-latest
+    # Fase 8 (roadmap tecnica): "Scansione automatica del codice per secret esposti (GitHub
+    # Secret Scanning)". GitHub Secret Scanning nativo con alert è una funzionalità di GitHub
+    # Advanced Security, a pagamento sui repository privati (questo repo è privato): gitleaks
+    # è l'equivalente gratuito e open source, eseguito qui su ogni push/PR così la scansione
+    # non dipende dal piano GitHub attivo. Va comunque abilitato anche il secret scanning
+    # nativo di GitHub da Settings → Code security del repository quando disponibile: le due
+    # cose non si escludono, si completano.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   backend:
     name: Backend (lint + test)
     runs-on: ubuntu-latest

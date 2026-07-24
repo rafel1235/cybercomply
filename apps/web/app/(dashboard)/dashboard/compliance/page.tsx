@@ -67,7 +67,9 @@ export default function CompliancePage() {
         <button
           onClick={() => switchTab("misure")}
           className={`border-b-2 px-3 py-2 text-sm font-medium ${
-            tab === "misure" ? "border-brand-blue text-brand-blue" : "border-transparent text-slate-500"
+            tab === "misure"
+              ? "border-brand-blue text-brand-blue"
+              : "border-transparent text-slate-500"
           }`}
         >
           Misure
@@ -75,7 +77,9 @@ export default function CompliancePage() {
         <button
           onClick={() => switchTab("documenti")}
           className={`border-b-2 px-3 py-2 text-sm font-medium ${
-            tab === "documenti" ? "border-brand-blue text-brand-blue" : "border-transparent text-slate-500"
+            tab === "documenti"
+              ? "border-brand-blue text-brand-blue"
+              : "border-transparent text-slate-500"
           }`}
         >
           Documenti
@@ -106,7 +110,8 @@ function MeasuresTab() {
 
   const measures = measuresQuery.data ?? [];
   const filtered = measures.filter((m) => {
-    const matchesCategory = categoryFilter === "Tutte" || complianceCategoryOf(m.measure_id) === categoryFilter;
+    const matchesCategory =
+      categoryFilter === "Tutte" || complianceCategoryOf(m.measure_id) === categoryFilter;
     const matchesStatus = statusFilter === "Tutti" || m.status === statusFilter;
     return matchesCategory && matchesStatus;
   });
@@ -127,7 +132,10 @@ function MeasuresTab() {
       await updateMutation.mutateAsync({ measureId, status, note });
       showToast("Nota salvata.", "success");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Errore durante il salvataggio della nota", "error");
+      showToast(
+        err instanceof Error ? err.message : "Errore durante il salvataggio della nota",
+        "error"
+      );
     }
   }
 
@@ -135,8 +143,7 @@ function MeasuresTab() {
     <div className="flex flex-col gap-4">
       {readOnly && (
         <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
-          Il piano Free mostra le prime 3 misure in sola lettura, come assaggio del
-          tracker.{" "}
+          Il piano Free mostra le prime 3 misure in sola lettura, come assaggio del tracker.{" "}
           <Link href="/settings/billing" className="font-medium text-brand-blue hover:underline">
             Passa a Essential
           </Link>{" "}
@@ -148,8 +155,8 @@ function MeasuresTab() {
           <p className="text-sm text-slate-500">Punteggio attuale</p>
           <p className="text-2xl font-bold text-brand-dark">{scoreQuery.data.score_percent}%</p>
           <p className="text-xs text-slate-500">
-            {scoreQuery.data.measures_conformi} conformi · {scoreQuery.data.measures_parziali} parziali ·{" "}
-            {scoreQuery.data.measures_non_conformi} non conformi ·{" "}
+            {scoreQuery.data.measures_conformi} conformi · {scoreQuery.data.measures_parziali}{" "}
+            parziali · {scoreQuery.data.measures_non_conformi} non conformi ·{" "}
             {scoreQuery.data.measures_non_applicabili} non applicabili
           </p>
         </div>
@@ -199,7 +206,10 @@ function MeasuresTab() {
                     {complianceCategoryOf(m.measure_id)} · {m.normative_reference}
                   </p>
                 </div>
-                <Badge label={MEASURE_STATUS_LABELS[m.status]} variant={MEASURE_STATUS_VARIANTS[m.status]} />
+                <Badge
+                  label={MEASURE_STATUS_LABELS[m.status]}
+                  variant={MEASURE_STATUS_VARIANTS[m.status]}
+                />
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -221,7 +231,9 @@ function MeasuresTab() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setHistoryOpenFor(historyOpenFor === m.measure_id ? null : m.measure_id)}
+                  onClick={() =>
+                    setHistoryOpenFor(historyOpenFor === m.measure_id ? null : m.measure_id)
+                  }
                   className="text-xs font-medium text-brand-blue hover:underline"
                 >
                   {historyOpenFor === m.measure_id ? "Nascondi cronologia" : "Cronologia"}
@@ -245,7 +257,9 @@ function MeasuresTab() {
                 <div className="mt-3 border-t border-slate-100 pt-3">
                   {(() => {
                     const entries = (auditQuery.data ?? []).filter(
-                      (e) => e.action === "compliance.measure_updated" && e.details.measure_id === m.measure_id
+                      (e) =>
+                        e.action === "compliance.measure_updated" &&
+                        e.details.measure_id === m.measure_id
                     );
                     if (entries.length === 0) {
                       return <p className="text-xs text-slate-500">Nessuna modifica registrata.</p>;
@@ -255,7 +269,8 @@ function MeasuresTab() {
                         {entries.map((e) => (
                           <li key={e.id} className="text-xs text-slate-500">
                             {formatDateTime(e.created_at)} — stato impostato a{" "}
-                            {MEASURE_STATUS_LABELS[String(e.details.status)] ?? String(e.details.status)}
+                            {MEASURE_STATUS_LABELS[String(e.details.status)] ??
+                              String(e.details.status)}
                           </li>
                         ))}
                       </ul>
@@ -312,7 +327,10 @@ function DocumentsTab() {
       await generatePdfMutation.mutateAsync(documentId);
       showToast("PDF generato, pronto per il download.", "success");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Errore durante la generazione del PDF", "error");
+      showToast(
+        err instanceof Error ? err.message : "Errore durante la generazione del PDF",
+        "error"
+      );
     }
   }
 
@@ -364,7 +382,10 @@ function DocumentsTab() {
             {quotaReached && (
               <>
                 {" · "}
-                <Link href="/settings/billing" className="font-medium text-brand-blue hover:underline">
+                <Link
+                  href="/settings/billing"
+                  className="font-medium text-brand-blue hover:underline"
+                >
                   aumenta il limite
                 </Link>
               </>

@@ -11,6 +11,11 @@
     "web:dev": "pnpm --filter @cybercomplyit/web dev",
     "web:build": "pnpm --filter @cybercomplyit/web build",
     "web:lint": "pnpm --filter @cybercomplyit/web lint",
-    "shared:build": "pnpm --filter @cybercomplyit/shared build"
+    "shared:build": "pnpm --filter @cybercomplyit/shared build",
+    "format": "prettier --write \"apps/web/**/*.{ts,tsx,js,jsx,json,css}\"",
+    "format:check": "prettier --check \"apps/web/**/*.{ts,tsx,js,jsx,json,css}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3"
   }
 }

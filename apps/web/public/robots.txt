@@ -6,4 +6,8 @@ Allow: /$
 Allow: /login
 Allow: /register
 Allow: /forgot-password
+Allow: /pricing
+Allow: /privacy-policy
+Allow: /cookie-policy
+Allow: /termini-di-servizio
 Allow: /questionario

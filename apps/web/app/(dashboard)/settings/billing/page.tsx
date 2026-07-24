@@ -50,7 +50,10 @@ export default function BillingSettingsPage() {
       const { checkout_url } = await checkoutMutation.mutateAsync(plan);
       window.location.href = checkout_url;
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Errore durante l'avvio del checkout", "error");
+      showToast(
+        err instanceof Error ? err.message : "Errore durante l'avvio del checkout",
+        "error"
+      );
       setPendingPlan(null);
     }
   }
@@ -124,8 +127,8 @@ export default function BillingSettingsPage() {
           <p className="mt-3 text-sm text-brand-amber">
             Prova gratuita di Essential attiva, senza carta di credito: scade il{" "}
             {formatDate(subscription.trial_ends_at)}. Passa a un piano a pagamento qui sotto in
-            qualsiasi momento, oppure lascia scadere la prova per tornare automaticamente al
-            piano Free (i tuoi dati non vengono mai cancellati).
+            qualsiasi momento, oppure lascia scadere la prova per tornare automaticamente al piano
+            Free (i tuoi dati non vengono mai cancellati).
           </p>
         )}
         {subscription.status === "past_due" && (
@@ -144,7 +147,10 @@ export default function BillingSettingsPage() {
           <div>
             <p className="text-xs font-medium uppercase text-slate-500">Documenti AI</p>
             <p className="text-sm text-slate-700">
-              {formatQuota(usage.documents_generated_this_month, entitlements.max_ai_documents_per_month)}
+              {formatQuota(
+                usage.documents_generated_this_month,
+                entitlements.max_ai_documents_per_month
+              )}
             </p>
           </div>
           <div>

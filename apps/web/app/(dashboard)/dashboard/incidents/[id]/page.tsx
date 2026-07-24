@@ -198,10 +198,7 @@ export default function IncidentDetailPage() {
           {incident.deadlines.map((deadline) => {
             const notification = incident.notifications.find((n) => n.phase === deadline.phase);
             return (
-              <div
-                key={deadline.phase}
-                className="rounded-lg border border-slate-200 bg-white p-4"
-              >
+              <div key={deadline.phase} className="rounded-lg border border-slate-200 bg-white p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-medium text-slate-800">

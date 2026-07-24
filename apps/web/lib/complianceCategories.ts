@@ -32,9 +32,10 @@ export const MEASURE_STATUS_LABELS: Record<string, string> = {
   non_applicabile: "Non applicabile",
 };
 
-export const MEASURE_STATUS_VARIANTS: Record<string, "success" | "warning" | "danger" | "neutral"> = {
-  conforme: "success",
-  parziale: "warning",
-  non_conforme: "danger",
-  non_applicabile: "neutral",
-};
+export const MEASURE_STATUS_VARIANTS: Record<string, "success" | "warning" | "danger" | "neutral"> =
+  {
+    conforme: "success",
+    parziale: "warning",
+    non_conforme: "danger",
+    non_applicabile: "neutral",
+  };

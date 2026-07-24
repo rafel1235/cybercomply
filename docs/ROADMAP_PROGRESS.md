@@ -635,3 +635,108 @@ GitHub Secret Scanning una volta pubblicato il repository); e, da Fase 9, la cre
 effettiva degli account Render/Vercel/Sentry/Supabase (staging+produzione) e dominio
 seguendo `docs/AMBIENTI.md`, con almeno un ciclo di restore-test del backup seguendo
 `docs/DISASTER_RECOVERY.md`.
+
+## Audit finale Fase 0-10 (post-completamento)
+
+Dopo aver completato tutte le fasi tecniche 0-10, è stato eseguito un audit sistematico di
+ogni fase contro la roadmap tecnica, per trovare eventuali requisiti mancati o integrazioni
+API dimenticate. Ecco cosa è stato trovato e corretto, e cosa è stato verificato come già
+a posto.
+
+### Bug reali trovati e corretti
+
+1. **Blocco account mai davvero applicato** (Fase 1/10): il blocco dopo 5 tentativi di
+   login falliti veniva registrato da `POST /auth/login-events`, ma quell'endpoint gira
+   *dopo* che il frontend ha già autenticato l'utente direttamente contro Supabase — un
+   account "bloccato" poteva quindi continuare a usare il proprio JWT su qualunque altro
+   endpoint. Corretto in `apps/api/app/api/deps.py` (`get_current_user` ora rifiuta con
+   423 un JWT valido se `locked_until` è nel futuro) e in
+   `apps/web/app/(public)/login/page.tsx` (se `/auth/sync` risponde 423, il frontend fa
+   logout esplicito invece di procedere alla dashboard). Nuovo test:
+   `test_locked_account_cannot_use_a_valid_jwt` in `apps/api/tests/test_auth.py`.
+2. **Sentry server/edge silenziosamente disattivato** (Fase 9): `sentry.server.config.ts`
+   e `sentry.edge.config.ts` leggevano `SENTRY_DSN`, una variabile mai presente in
+   `apps/web/.env.example` e senza fallback — seguendo solo la documentazione esistente
+   (impostare `NEXT_PUBLIC_SENTRY_DSN`), il tracking server/edge sarebbe rimasto
+   permanentemente disattivato anche a produzione configurata. Corretto con un fallback
+   (`process.env.SENTRY_DSN ?? process.env.NEXT_PUBLIC_SENTRY_DSN`, un DSN Sentry non è un
+   segreto) e aggiunta la variabile `SENTRY_DSN` a `.env.example` con spiegazione.
+
+### Gap reali colmati (non solo bug, funzionalità mancanti)
+
+3. **Pagina pricing pubblica mancante** (Fase 4): la roadmap la richiede esplicitamente
+   ("Pagina pricing con dettaglio piani"), non esisteva. Creata
+   `apps/web/app/(public)/pricing/page.tsx`, che riusa la stessa fonte dati di
+   `settings/billing` (`lib/planLabels.ts`) per non disallineare mai i prezzi mostrati agli
+   utenti già registrati da quelli mostrati pubblicamente.
+4. **Footer di sito mancante** (Fase 4: "Footer con Privacy Policy, Cookie Policy, Termini
+   di servizio, Contatti, P.IVA"): creato `apps/web/components/marketing/Footer.tsx`,
+   agganciato alla landing page e alla pagina pricing. La P.IVA è un placeholder esplicito
+   (`[da inserire]`) in attesa del dato reale.
+5. **Privacy Policy e Termini di servizio assenti**: la Cookie Policy già rimandava a una
+   Privacy Policy "in preparazione" che non esisteva (link altrimenti rotto dal nuovo
+   footer). Create `apps/web/app/(public)/privacy-policy/page.tsx` e
+   `.../termini-di-servizio/page.tsx`: bozze oneste basate su ciò che la piattaforma fa
+   davvero (stesso approccio di `docs/REGISTRO_TRATTAMENTI.md`), esplicitamente marcate
+   come non sostitutive di una revisione legale (Fase 11, fuori dall'ambito di questo
+   audit).
+6. **Configurazione Prettier assente** (Fase 0: "Configurare ESLint + Prettier con regole
+   condivise"): non esisteva alcun `.prettierrc`, né `prettier` tra le dipendenze. Aggiunti
+   `.prettierrc.json`, `.prettierignore`, `prettier` + `eslint-config-prettier` come
+   devDependency, script `format`/`format:check` in `package.json` root e
+   `apps/web/package.json`. L'intero codice di `apps/web` è stato riformattato con
+   `prettier --write` per stabilire davvero la baseline (26 file toccati, solo
+   whitespace/wrapping, nessuna modifica di logica: verificato con `tsc`/`next lint`/`next
+   build` invariati dopo la riformattazione).
+7. **`README.md` radice completamente disallineato**: indicava ancora "Fase 0-3" come stato
+   di avanzamento, menzionava shadcn/ui (mai installato), Docker come unico modo per
+   Postgres locale (i test non lo richiedono affatto, solo il server di sviluppo), e
+   ometteva Sentry/`FIELD_ENCRYPTION_KEY`/storage bucket dalla sezione variabili
+   d'ambiente. Riscritto per riflettere lo stato reale e collegare tutta la documentazione
+   di `docs/`.
+8. **Scansione secret non automatizzata** (Fase 8: "Scansione automatica del codice per
+   secret esposti — GitHub Secret Scanning"): il secret scanning nativo di GitHub con alert
+   richiede GitHub Advanced Security sui repository privati (a pagamento). Aggiunto un job
+   `secret-scan` con `gitleaks` in `.github/workflows/ci.yml`, gratuito e indipendente dal
+   piano GitHub attivo, eseguito su ogni push/PR.
+
+### Requisiti verificati come già soddisfatti (nessuna modifica necessaria)
+
+- **Rate limiting globale API (Fase 3)**: `app/core/rate_limit.py` già implementa
+  `Limiter(key_func=rate_limit_key, default_limits=["100/minute"])`, chiave per utente
+  autenticato (fallback IP), montato via `SlowAPIMiddleware` in `main.py` — esattamente il
+  requisito "100 req/min per utente", distinto dal rate limit di login già verificato.
+- **CSRF protection (Fase 1)**: non implementata esplicitamente, ma non necessaria data
+  l'architettura — l'API richiede sempre un header `Authorization: Bearer` esplicito (mai
+  cookie di sessione per l'autenticazione contro il backend, confermato in
+  `apps/web/lib/api.ts`, nessun `credentials: "include"`), il pattern standard con cui le
+  SPA moderne eliminano il rischio CSRF alla radice invece di aggiungere token CSRF a un
+  meccanismo di auth basato su cookie che qui non esiste.
+- **6 documenti AI nominati dalla roadmap (Fase 5)**: tutti presenti tra i 9 documenti
+  effettivamente implementati (`app/models/document.py`, `DocumentType`), i 3 aggiuntivi
+  derivano dalla Guida al Servizio (fonte più autoritativa/dettagliata della roadmap per
+  questo aspetto).
+- **URL di download PDF "firmato e temporaneo" (Fase 5)**: implementato con un meccanismo
+  diverso ma equivalente sul piano della sicurezza — l'endpoint `GET
+  /documents/{id}/pdf` richiede sempre un JWT valido e verifica l'appartenenza
+  all'organizzazione (`_get_owned_document`), invece di un link firmato a scadenza. I file
+  non sono mai in un bucket pubblico.
+- **Elenco email transazionali (Fase 7)**: tutte le 12 email richieste dalla roadmap sono
+  implementate in `app/services/email_templates.py` (benvenuto, invito, pagamento
+  riuscito/fallito, abbonamento cancellato, trial in scadenza/scaduto, alert scadenza NIS2,
+  incidente scaduto, fornitore con questionario scaduto, report mensile) — conferma e reset
+  password sono gestiti nativamente da Supabase Auth, non da template custom.
+- **Header di sicurezza, robots.txt, no directory listing (Fase 8)**: `SecurityHeadersMiddleware`
+  già imposta CSP, HSTS (in produzione), `X-Frame-Options`, e sovrascrive esplicitamente
+  l'header `Server` per non esporre versioni di librerie; nessun `StaticFiles` con listing
+  abilitato in nessuna route; `apps/web/public/robots.txt` esclude già `/dashboard` e
+  `/settings` (aggiornato in questo audit per includere anche le nuove pagine pubbliche
+  pricing/privacy-policy/termini-di-servizio nell'elenco `Allow` esplicito).
+
+### Verifica eseguita per questo audit
+
+Backend: 223/223 test passati (incluso il nuovo test sul blocco account), `ruff` e `black`
+puliti. Frontend: `tsc --noEmit` e `next lint` senza errori, build di produzione completata
+con successo su tutte le 22 route (le 3 nuove pagine pubbliche incluse), verificata sia
+prima che dopo la riformattazione Prettier per isolare eventuali regressioni introdotte
+dalla riformattazione stessa (nessuna trovata).

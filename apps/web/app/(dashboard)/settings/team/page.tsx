@@ -150,12 +150,18 @@ export default function TeamSettingsPage() {
       </div>
 
       {isAdmin ? (
-        <form onSubmit={handleInvite} className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5">
+        <form
+          onSubmit={handleInvite}
+          className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5"
+        >
           <p className="font-semibold text-slate-700">Invita un collaboratore</p>
           {atSeatLimit && (
             <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
               Hai raggiunto il numero massimo di posti del piano {PLAN_LABELS[subscription!.plan]}.{" "}
-              <Link href="/settings/billing" className="font-medium text-brand-blue hover:underline">
+              <Link
+                href="/settings/billing"
+                className="font-medium text-brand-blue hover:underline"
+              >
                 Passa a un piano superiore
               </Link>{" "}
               per invitare altri collaboratori.

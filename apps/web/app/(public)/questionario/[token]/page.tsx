@@ -6,16 +6,17 @@ import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { apiFetchPublic, ApiError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { QUESTIONNAIRE_QUESTION_LABELS, SUPPLIER_STATUS_LABELS, SUPPLIER_STATUS_VARIANTS } from "@/lib/supplierLabels";
+import {
+  QUESTIONNAIRE_QUESTION_LABELS,
+  SUPPLIER_STATUS_LABELS,
+  SUPPLIER_STATUS_VARIANTS,
+} from "@/lib/supplierLabels";
 
 /** Rispecchia il calcolo di app/services/supplier_scoring.py: la risposta pubblica non
  * include lo stato calcolato (vista intenzionalmente minimale), quindi lo si ricava qui
  * dalle stesse risposte per mostrare una conferma coerente con quanto registrato lato
  * organizzazione. */
-function computeStatusPreview(
-  answers: Record<string, unknown>,
-  questions: string[]
-): string {
+function computeStatusPreview(answers: Record<string, unknown>, questions: string[]): string {
   const positiveCount = questions.filter((q) => answers[q] === true).length;
   if (positiveCount === questions.length) return "conforme";
   if (positiveCount === 0) return "non_conforme";
@@ -86,9 +87,7 @@ export default function PublicQuestionnairePage() {
         result.completed_at ? computeStatusPreview(result.answers, result.questions) : null
       );
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Errore durante l'invio. Riprova."
-      );
+      setSubmitError(err instanceof Error ? err.message : "Errore durante l'invio. Riprova.");
     } finally {
       setSubmitting(false);
     }
@@ -146,9 +145,7 @@ export default function PublicQuestionnairePage() {
                   type="checkbox"
                   className="mt-0.5"
                   checked={answers[question] ?? false}
-                  onChange={(e) =>
-                    setAnswers((a) => ({ ...a, [question]: e.target.checked }))
-                  }
+                  onChange={(e) => setAnswers((a) => ({ ...a, [question]: e.target.checked }))}
                 />
                 {QUESTIONNAIRE_QUESTION_LABELS[question] ?? question}
               </label>

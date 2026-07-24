@@ -29,8 +29,7 @@ export function Header({
       ? Math.max(
           0,
           Math.ceil(
-            (new Date(subscription.trial_ends_at).getTime() - Date.now()) /
-              (1000 * 60 * 60 * 24)
+            (new Date(subscription.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
           )
         )
       : null;

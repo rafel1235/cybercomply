@@ -49,7 +49,8 @@ const REGULATORY_DEADLINES = [
     label: "CRA: piena applicazione, marcatura CE obbligatoria",
     reference: "Reg. UE 2024/2847",
   },
-].filter((d) => new Date(d.date).getTime() >= Date.now() - 1000 * 60 * 60 * 24)
+]
+  .filter((d) => new Date(d.date).getTime() >= Date.now() - 1000 * 60 * 60 * 24)
   .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
 export default function DashboardPage() {
@@ -106,7 +107,10 @@ export default function DashboardPage() {
             ) : (
               <>
                 <p className="text-2xl font-bold text-brand-dark">—</p>
-                <Link href="/dashboard/assessment" className="mt-1 text-xs text-brand-blue hover:underline">
+                <Link
+                  href="/dashboard/assessment"
+                  className="mt-1 text-xs text-brand-blue hover:underline"
+                >
                   Esegui l&apos;assessment
                 </Link>
               </>
@@ -175,7 +179,9 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Grafico andamento score */}
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="mb-3 text-sm font-semibold text-slate-700">Andamento indice di conformità</p>
+          <p className="mb-3 text-sm font-semibold text-slate-700">
+            Andamento indice di conformità
+          </p>
           {historyQuery.isLoading ? (
             <Skeleton className="h-[220px] w-full" />
           ) : (

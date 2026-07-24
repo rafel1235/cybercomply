@@ -53,7 +53,7 @@ function LoginForm() {
 
     // Sincronizza l'utente nel backend (crea organizzazione alla primissima volta).
     if (data.session) {
-      await fetch(`${API_BASE_URL}/auth/sync`, {
+      const syncResponse = await fetch(`${API_BASE_URL}/auth/sync`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -61,6 +61,21 @@ function LoginForm() {
         },
         body: JSON.stringify({}),
       }).catch(() => null);
+
+      // Bug reale corretto (Fase 10 — audit finale): l'account può risultare "bloccato"
+      // lato nostro backend (troppi tentativi falliti) anche se Supabase ha appena
+      // autenticato con successo — Supabase non sa nulla del nostro blocco. Prima di
+      // questa correzione l'utente veniva comunque mandato in dashboard, dove ogni
+      // chiamata avrebbe iniziato a fallire silenziosamente con 423. Ora il logout è
+      // esplicito e l'errore è chiaro.
+      if (syncResponse && syncResponse.status === 423) {
+        await supabase.auth.signOut();
+        setLoading(false);
+        setError(
+          "Account temporaneamente bloccato per troppi tentativi di accesso falliti. Riprova tra qualche minuto."
+        );
+        return;
+      }
     }
 
     setLoading(false);
@@ -76,13 +91,7 @@ function LoginForm() {
       )}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Field label="Email" type="email" value={email} onChange={setEmail} required />
-        <Field
-          label="Password"
-          type="password"
-          value={password}
-          onChange={setPassword}
-          required
-        />
+        <Field label="Password" type="password" value={password} onChange={setPassword} required />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           type="submit"

@@ -15,8 +15,8 @@ export function ScoreTrendChart({ points }: { points: ComplianceHistoryPoint[] }
   if (points.length === 0) {
     return (
       <p className="text-sm text-slate-500">
-        Ancora nessuno storico da mostrare: aggiorna una misura nel Compliance Tracker per
-        iniziare a vedere l&apos;andamento nel tempo.
+        Ancora nessuno storico da mostrare: aggiorna una misura nel Compliance Tracker per iniziare
+        a vedere l&apos;andamento nel tempo.
       </p>
     );
   }

@@ -49,7 +49,9 @@ export default function ComplianceReportPage() {
         <h2 className="mt-2 text-lg font-semibold text-slate-800">
           Report di conformità NIS2 / Det. ACN 164179/2025
         </h2>
-        <p className="text-sm text-slate-500">Generato il {formatDateTime(new Date().toISOString())}</p>
+        <p className="text-sm text-slate-500">
+          Generato il {formatDateTime(new Date().toISOString())}
+        </p>
       </header>
 
       {score && (

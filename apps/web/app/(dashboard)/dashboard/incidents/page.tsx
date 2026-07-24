@@ -40,9 +40,7 @@ export default function IncidentsPage() {
     if (!search.trim()) return list;
     const q = search.trim().toLowerCase();
     return list.filter(
-      (i) =>
-        i.incident_type.toLowerCase().includes(q) ||
-        i.reference_code.toLowerCase().includes(q)
+      (i) => i.incident_type.toLowerCase().includes(q) || i.reference_code.toLowerCase().includes(q)
     );
   }, [incidentsQuery.data, search]);
 

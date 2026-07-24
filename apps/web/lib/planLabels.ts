@@ -50,12 +50,7 @@ export const PLAN_FEATURES: Record<Plan, string[]> = {
     "Supply Chain incluso, fornitori illimitati",
     "Report trimestrali",
   ],
-  enterprise: [
-    "Utenti illimitati",
-    "Tutto ciò che include Business",
-    "White-label",
-    "Accesso API",
-  ],
+  enterprise: ["Utenti illimitati", "Tutto ciò che include Business", "White-label", "Accesso API"],
 };
 
 export const PLAN_PURCHASABLE: Record<Plan, boolean> = {

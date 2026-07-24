@@ -8,7 +8,11 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/dashboard/assessment", label: "Assessment" },
   { href: "/dashboard/compliance", label: "Compliance Tracker" },
-  { href: "/dashboard/incidents", label: "Incident Reporting", gate: "incident_reporting_enabled" as const },
+  {
+    href: "/dashboard/incidents",
+    label: "Incident Reporting",
+    gate: "incident_reporting_enabled" as const,
+  },
   { href: "/dashboard/suppliers", label: "Supply Chain", gate: "supply_chain_enabled" as const },
 ];
 

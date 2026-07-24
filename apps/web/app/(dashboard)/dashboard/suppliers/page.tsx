@@ -250,7 +250,9 @@ export default function SuppliersPage() {
                       onClick={() => setExpandedId(expanded ? null : supplier.id)}
                       className="text-xs font-medium text-brand-blue hover:underline"
                     >
-                      {expanded ? "Nascondi questionari" : `Questionari (${supplier.questionnaires.length})`}
+                      {expanded
+                        ? "Nascondi questionari"
+                        : `Questionari (${supplier.questionnaires.length})`}
                     </button>
                   )}
                   {supplier.last_reviewed_at && (
