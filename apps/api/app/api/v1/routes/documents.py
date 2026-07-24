@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -11,7 +10,6 @@ from app.api.deps import (
     get_db,
     require_admin,
 )
-from app.core.config import get_settings
 from app.models.assessment import AssessmentResult
 from app.models.document import Document, DocumentType
 from app.schemas.document import (
@@ -19,6 +17,7 @@ from app.schemas.document import (
     DocumentOut,
     DocumentUpdateRequest,
 )
+from app.services import pdf_storage
 from app.services.ai_document_generator import generate_document_content
 from app.services.audit import record_audit_event
 from app.services.entitlements import PlanEntitlements
@@ -244,8 +243,9 @@ def generate_pdf(
     db: Session = Depends(get_db),
 ) -> DocumentOut:
     """Genera un PDF reale (non simulato) a partire dal contenuto attuale del documento e
-    lo salva su storage locale, in attesa dell'integrazione con Supabase Storage (Fase 6).
-    """
+    lo salva su Supabase Storage se configurato, altrimenti su disco locale (Fase 9:
+    vedi app/services/pdf_storage.py — su un host con filesystem effimero il solo disco
+    locale non è persistente tra un deploy e l'altro)."""
     document = _get_owned_document(db, membership.organization.id, document_id)
 
     pdf_bytes = render_document_pdf(
@@ -257,16 +257,11 @@ def generate_pdf(
         ai_generated=document.content.get("generato_da") == "ai",
     )
 
-    settings = get_settings()
-    org_dir = (
-        settings.local_storage_path / "documents" / str(membership.organization.id)
-    )
-    org_dir.mkdir(parents=True, exist_ok=True)
-    file_path = org_dir / f"{document.id}_v{document.version}.pdf"
-    file_path.write_bytes(pdf_bytes)
-
-    document.pdf_url = (
-        f"local://documents/{membership.organization.id}/{file_path.name}"
+    filename = f"{document.id}_v{document.version}.pdf"
+    document.pdf_url = pdf_storage.save_pdf(
+        organization_id=membership.organization.id,
+        filename=filename,
+        pdf_bytes=pdf_bytes,
     )
     db.add(document)
     db.commit()
@@ -280,7 +275,7 @@ def download_pdf(
     document_id: str,
     membership: CurrentMembership = Depends(get_current_membership),
     db: Session = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     """Scarica i byte reali del PDF già generato (POST .../pdf crea/rigenera il file,
     questo endpoint lo restituisce). Separato dalla generazione così il frontend può
     offrire un link di download diretto senza rigenerare il PDF ad ogni click."""
@@ -292,17 +287,16 @@ def download_pdf(
             "POST /documents/{id}/pdf",
         )
 
-    settings = get_settings()
-    relative_path = document.pdf_url.removeprefix("local://")
-    file_path = settings.local_storage_path / relative_path
-    if not file_path.exists():
+    pdf_bytes = pdf_storage.load_pdf(document.pdf_url)
+    if pdf_bytes is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="File PDF non trovato su disco: rigeneralo con POST /documents/{id}/pdf",
+            detail="File PDF non trovato: rigeneralo con POST /documents/{id}/pdf",
         )
 
-    return FileResponse(
-        file_path,
+    filename = f"{document.doc_type.value}_v{document.version}.pdf"
+    return Response(
+        content=pdf_bytes,
         media_type="application/pdf",
-        filename=f"{document.doc_type.value}_v{document.version}.pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

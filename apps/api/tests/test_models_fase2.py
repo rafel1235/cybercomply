@@ -56,14 +56,18 @@ def test_compliance_measure_unique_per_organization(db_session):
     org = _make_org(db_session)
     db_session.add(
         ComplianceMeasure(
-            organization_id=org.id, measure_id="mfa_accessi_remoti", status=MeasureStatus.conforme
+            organization_id=org.id,
+            measure_id="mfa_accessi_remoti",
+            status=MeasureStatus.conforme,
         )
     )
     db_session.commit()
 
     db_session.add(
         ComplianceMeasure(
-            organization_id=org.id, measure_id="mfa_accessi_remoti", status=MeasureStatus.parziale
+            organization_id=org.id,
+            measure_id="mfa_accessi_remoti",
+            status=MeasureStatus.parziale,
         )
     )
     with pytest.raises(IntegrityError):
@@ -122,7 +126,9 @@ def test_incident_notifications_cascade_delete(db_session):
 def test_supplier_questionnaire_access_token_unique(db_session):
     org = _make_org(db_session)
     supplier = Supplier(
-        organization_id=org.id, name="Cloud Provider SpA", criticality=SupplierCriticality.alta
+        organization_id=org.id,
+        name="Cloud Provider SpA",
+        criticality=SupplierCriticality.alta,
     )
     db_session.add(supplier)
     db_session.flush()
@@ -130,14 +136,18 @@ def test_supplier_questionnaire_access_token_unique(db_session):
     token = uuid.uuid4().hex
     db_session.add(
         SupplierQuestionnaire(
-            supplier_id=supplier.id, access_token=token, computed_status=SupplierStatus.non_valutato
+            supplier_id=supplier.id,
+            access_token=token,
+            computed_status=SupplierStatus.non_valutato,
         )
     )
     db_session.commit()
 
     db_session.add(
         SupplierQuestionnaire(
-            supplier_id=supplier.id, access_token=token, computed_status=SupplierStatus.conforme
+            supplier_id=supplier.id,
+            access_token=token,
+            computed_status=SupplierStatus.conforme,
         )
     )
     with pytest.raises(IntegrityError):
@@ -149,13 +159,17 @@ def test_subscription_one_per_organization(db_session):
     org = _make_org(db_session)
     db_session.add(
         Subscription(
-            organization_id=org.id, plan=Plan.essential, status=SubscriptionStatus.trialing
+            organization_id=org.id,
+            plan=Plan.essential,
+            status=SubscriptionStatus.trialing,
         )
     )
     db_session.commit()
 
     db_session.add(
-        Subscription(organization_id=org.id, plan=Plan.business, status=SubscriptionStatus.active)
+        Subscription(
+            organization_id=org.id, plan=Plan.business, status=SubscriptionStatus.active
+        )
     )
     with pytest.raises(IntegrityError):
         db_session.commit()
@@ -172,8 +186,12 @@ def test_deleting_organization_cascades_to_all_fase2_tables(db_session):
             answers={},
         )
     )
-    db_session.add(ComplianceMeasure(organization_id=org.id, measure_id="backup_cifrati_testati"))
-    db_session.add(Document(organization_id=org.id, doc_type=DocumentType.piano_bcp, content={}))
+    db_session.add(
+        ComplianceMeasure(organization_id=org.id, measure_id="backup_cifrati_testati")
+    )
+    db_session.add(
+        Document(organization_id=org.id, doc_type=DocumentType.piano_bcp, content={})
+    )
     supplier = Supplier(organization_id=org.id, name="Fornitore Test")
     db_session.add(supplier)
     db_session.add(Subscription(organization_id=org.id, plan=Plan.free))
@@ -183,8 +201,14 @@ def test_deleting_organization_cascades_to_all_fase2_tables(db_session):
     db_session.delete(org)
     db_session.commit()
 
-    assert db_session.query(AssessmentResult).filter_by(organization_id=org_id).count() == 0
-    assert db_session.query(ComplianceMeasure).filter_by(organization_id=org_id).count() == 0
+    assert (
+        db_session.query(AssessmentResult).filter_by(organization_id=org_id).count()
+        == 0
+    )
+    assert (
+        db_session.query(ComplianceMeasure).filter_by(organization_id=org_id).count()
+        == 0
+    )
     assert db_session.query(Document).filter_by(organization_id=org_id).count() == 0
     assert db_session.query(Supplier).filter_by(organization_id=org_id).count() == 0
     assert db_session.query(Subscription).filter_by(organization_id=org_id).count() == 0

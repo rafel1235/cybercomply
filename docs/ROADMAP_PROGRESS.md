@@ -336,7 +336,88 @@ lato GDPR (Privacy Policy/Cookie Policy vere e proprie con un avvocato, DPA con 
 fornitori, verifica dei trasferimenti extra-UE, decisione sul DPO, GitHub Secret
 Scanning).
 
+## Fase 9 — Infrastruttura e deploy — ✅ completata e verificata
+- [x] **CI/CD**: `.github/workflows/ci.yml` riscritto da zero (la versione preesistente
+      eseguiva solo lint+test senza Postgres raggiungibile: sarebbe fallita al primo run
+      reale). Pipeline in 4 job: `backend` (ruff, black --check, pytest con copertura),
+      `frontend` (tsc, next lint, next build), `deploy-staging` (solo su push a `main`,
+      dopo che backend e frontend sono passati, `environment: staging`) e
+      `deploy-production` (dopo staging, `environment: production`) — l'approvazione
+      manuale richiesta dalla roadmap prima della produzione si ottiene con i Required
+      Reviewers dell'Environment `production` su GitHub (impostazione da fare nella
+      dashboard del repository, non esprimibile in YAML).
+- [x] **Correzione di sicurezza scoperta preparando la CI**: `tests/conftest.py` avviava
+      Postgres embedded solo se non c'era già un `DATABASE_URL` — se per qualunque motivo
+      un `DATABASE_URL` reale fosse stato presente nell'ambiente (es. un `.env` con
+      credenziali vere), eseguire `pytest` avrebbe cancellato/ricreato le tabelle su un
+      database reale. Corretto forzando Postgres embedded (`pgserver`) in ogni caso,
+      prima ancora di importare l'applicazione: i test non possono più, per costruzione,
+      toccare un database che non sia quello effimero creato per loro.
+- [x] **Ambienti**: `docs/AMBIENTI.md` — strategia a 3 ambienti (dev/staging/production),
+      due progetti Supabase separati (staging e produzione, mai lo stesso database),
+      checklist operativa completa e numerata (Supabase, Render, GitHub, Vercel, dominio
+      e DNS) per quando il titolare avrà gli account reali: nessuno di questi passaggi è
+      eseguibile da qui, richiedono tutti una dashboard reale.
+- [x] **Config hosting**: `render.yaml` (Infrastructure as Code) con due servizi web
+      (`cybercomplyit-api-staging`, `cybercomplyit-api-production`), regione Francoforte
+      (UE, per il vincolo GDPR), `autoDeploy: false` su entrambi — il deploy parte solo
+      dalla pipeline CI dopo che i test sono passati, mai automaticamente ad ogni push.
+      `apps/web/vercel.json` con `regions: ["fra1"]` per lo stesso motivo (Vercel ha già
+      integrazione nativa GitHub per il deploy automatico e le preview delle PR, non
+      serve un job CI dedicato).
+- [x] **Bug reale scoperto e corretto in questa fase**: i PDF generati venivano scritti
+      solo su disco locale. Su un host con filesystem effimero come Render (azzerato ad
+      ogni deploy) questo significa perdere silenziosamente tutti i PDF al primo deploy
+      successivo, con il database che continua a riportare un `pdf_url` valido e un 404
+      alla prima richiesta di download. Corretto con `app/services/pdf_storage.py`: carica
+      su Supabase Storage quando configurato (stesse credenziali della Admin API di Fase
+      8), con ripiego automatico e trasparente su disco locale se Supabase Storage non
+      risponde o non è configurato — nessun comportamento esistente cambia finché non si
+      passa a un ambiente reale con Storage configurato (mai successo in questa sessione).
+- [x] **Monitoraggio**: Sentry error tracking, sia backend (`app/core/monitoring.py`,
+      inizializzato solo se `SENTRY_DSN` è reale, cattura anche le eccezioni gestite dal
+      middleware globale) sia frontend (`@sentry/nextjs`, convenzione App Router —
+      `instrumentation.ts` + `instrumentation-client.ts` + config server/edge). Il wrapping
+      Sentry di `next.config.js` è condizionato alla presenza di `NEXT_PUBLIC_SENTRY_DSN`
+      per non appesantire ogni build quando non è configurato (stato attuale). Uptime
+      monitoring (Better Uptime/UptimeRobot puntato su `/health`) e il dashboard nativo dei
+      costi Anthropic restano configurazioni esterne, documentate in
+      `docs/MONITORAGGIO.md` ma non eseguibili da qui.
+- [x] **Backup e disaster recovery**: `docs/DISASTER_RECOVERY.md` — backup automatici
+      giornalieri di Supabase (inclusi su ogni piano), procedura di restore-test da
+      eseguire almeno una volta prima del lancio (mai eseguita in questa sessione, nessun
+      progetto Supabase reale esiste ancora), e un runbook per 4 scenari concreti (backend
+      irraggiungibile, database irraggiungibile, cancellazione per errore, perdita della
+      chiave di cifratura Fase 8 — quest'ultima irreversibile per costruzione, da
+      conservare in un secret manager separato dal database).
+
+**Nota importante**: nessun account reale (Render, Vercel, Sentry, dominio) è mai stato
+creato o collegato in questa sessione — ogni integrazione degrada in modo controllato
+quando non configurata, esattamente come Anthropic/Stripe/Resend nelle fasi precedenti.
+La pipeline CI/CD non è mai stata eseguita su un runner GitHub reale (nessun repository
+remoto collegato in questa sessione): verificata leggendo ed eseguendo localmente ogni
+comando che contiene, non osservandola girare su GitHub.
+
 ## Verifica eseguita (non solo scritta: testata davvero)
+- **Verifica finale Fase 9**: nessuna nuova migration in questa fase. **213/213 test
+  automatici passati** (205 precedenti + 8 nuovi per `pdf_storage.py`: salvataggio/lettura
+  locale invariati quando Supabase Storage non è configurato, upload e download da
+  Supabase Storage con `httpx` sostituito da un doppio di test, ripiego automatico su
+  disco locale se l'upload fallisce, nessuna perdita del PDF in nessuno scenario).
+  Copertura (`pytest-cov`): **96% (2298 statement, 87 non coperti)** — la riga scoperta più
+  significativa resta `app/services/supabase_admin.py` (43%, stesso motivo delle fasi
+  precedenti: mai configurato con credenziali reali). Lint (`ruff`) e formattazione
+  (`black --check`) puliti su `app/`, `tests/` e `migrations/`. Frontend: `tsc --noEmit`
+  pulito, `next lint` pulito, `next build` completata con successo con le stesse **19
+  route** di Fase 8 (nessuna nuova pagina in questa fase, solo infrastruttura) —
+  verificato sia il percorso di default (senza `NEXT_PUBLIC_SENTRY_DSN`, build rapida,
+  invariata) sia che il wrapping condizionale di Sentry in `next.config.js` produca una
+  configurazione valida quando il DSN è impostato (una build completa con un DSN finto
+  supera il limite di tempo di questo ambiente sandbox per il lavoro aggiuntivo del
+  plugin webpack di Sentry — limite noto della sandbox di sviluppo, non un difetto del
+  codice: verificato che il modulo si carica e produce una config valida senza eccezioni).
+  Diff completo tra la copia di verifica Linux e la cartella consegnata: nessuna
+  differenza su tutti i file toccati in questa fase.
 - **Verifica finale Fase 8**: migration esistenti riapplicate da zero su Postgres reale
   più la nuova migration di cifratura (`vat_number`/`incidents.data` da tipo nativo a
   `TEXT` opaco), **199/199 test automatici passati** (181 precedenti + 3 header di
@@ -461,15 +542,21 @@ Scanning).
 - Repository Git locale creato con commit iniziale in questa cartella.
 
 ## Fasi successive (non ancora iniziate)
-Fase 9 (infrastruttura/deploy — anche per collegare `scripts/send_scheduled_emails.py` a
-un vero cron giornaliero invece dell'esecuzione manuale attuale, e per spostare il
-downgrade trial→Free su quel cron invece del calcolo lazy attuale), Fase 10
-(performance), Fase 11 (lancio) — da eseguire un modulo alla volta, come da preferenza
-espressa. Prima del lancio commerciale vanno anche: impostata una vera
-`ANTHROPIC_API_KEY` e validati i prompt con un esperto legale (Fase 5); impostate le
-chiavi Stripe reali ed eseguito un ciclo di checkout/webhook contro il suo ambiente di
-test (Fase 6); impostata una vera `RESEND_API_KEY` con dominio mittente verificato
-SPF/DKIM/DMARC (Fase 7); tutti i compiti non tecnici elencati nella nota di chiusura della
-Fase 8 e nel §3 di `docs/REGISTRO_TRATTAMENTI.md` (Privacy Policy/Cookie Policy con un
-avvocato, DPA con Supabase/Stripe/Resend/Anthropic, verifica dei trasferimenti extra-UE,
-decisione sul DPO, GitHub Secret Scanning una volta pubblicato il repository).
+Fase 10 (performance), Fase 11 (lancio) — da eseguire un modulo alla volta, come da
+preferenza espressa. Nota: `scripts/send_scheduled_emails.py` ha ora una pipeline CI/CD
+pronta (Fase 9) ma non è ancora collegato a un vero cron giornaliero — questo richiede un
+account Render/GitHub reale (Render Cron Job o GitHub Actions schedulato) e resta da fare
+appena quegli account esisteranno; anche il downgrade trial→Free resta calcolato "lazy"
+alla richiesta, non ancora spostato su un cron.
+
+Prima del lancio commerciale vanno anche: impostata una vera `ANTHROPIC_API_KEY` e
+validati i prompt con un esperto legale (Fase 5); impostate le chiavi Stripe reali ed
+eseguito un ciclo di checkout/webhook contro il suo ambiente di test (Fase 6); impostata
+una vera `RESEND_API_KEY` con dominio mittente verificato SPF/DKIM/DMARC (Fase 7); tutti i
+compiti non tecnici elencati nella nota di chiusura della Fase 8 e nel §3 di
+`docs/REGISTRO_TRATTAMENTI.md` (Privacy Policy/Cookie Policy con un avvocato, DPA con
+Supabase/Stripe/Resend/Anthropic, verifica dei trasferimenti extra-UE, decisione sul DPO,
+GitHub Secret Scanning una volta pubblicato il repository); e, da Fase 9, la creazione
+effettiva degli account Render/Vercel/Sentry/Supabase (staging+produzione) e dominio
+seguendo `docs/AMBIENTI.md`, con almeno un ciclo di restore-test del backup seguendo
+`docs/DISASTER_RECOVERY.md`.

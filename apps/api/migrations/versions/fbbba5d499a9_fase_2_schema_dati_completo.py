@@ -25,7 +25,9 @@ def upgrade() -> None:
         sa.Column("organization_id", sa.UUID(), nullable=False),
         sa.Column(
             "nis2_category",
-            sa.Enum("essenziale", "importante", "non_in_perimetro", name="nis2_category"),
+            sa.Enum(
+                "essenziale", "importante", "non_in_perimetro", name="nis2_category"
+            ),
             nullable=False,
         ),
         sa.Column("cra_in_scope", sa.Boolean(), nullable=False),
@@ -38,7 +40,9 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["organization_id"], ["organizations.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -61,7 +65,11 @@ def upgrade() -> None:
         sa.Column(
             "status",
             sa.Enum(
-                "conforme", "parziale", "non_conforme", "non_applicabile", name="measure_status"
+                "conforme",
+                "parziale",
+                "non_conforme",
+                "non_applicabile",
+                name="measure_status",
             ),
             nullable=False,
         ),
@@ -73,10 +81,14 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("updated_by", sa.UUID(), nullable=True),
-        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["organization_id"], ["organizations.id"], ondelete="CASCADE"
+        ),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("organization_id", "measure_id", name="uq_compliance_measure_per_org"),
+        sa.UniqueConstraint(
+            "organization_id", "measure_id", name="uq_compliance_measure_per_org"
+        ),
     )
     op.create_index(
         "ix_compliance_measures_org_updated",
@@ -121,14 +133,22 @@ def upgrade() -> None:
         ),
         sa.Column("created_by", sa.UUID(), nullable=True),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["organization_id"], ["organizations.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        "ix_documents_org_created", "documents", ["organization_id", "created_at"], unique=False
+        "ix_documents_org_created",
+        "documents",
+        ["organization_id", "created_at"],
+        unique=False,
     )
     op.create_index(
-        op.f("ix_documents_organization_id"), "documents", ["organization_id"], unique=False
+        op.f("ix_documents_organization_id"),
+        "documents",
+        ["organization_id"],
+        unique=False,
     )
     op.create_table(
         "incidents",
@@ -142,20 +162,31 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column(
-            "opened_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "opened_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column("closed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("data", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("created_by", sa.UUID(), nullable=True),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["organization_id"], ["organizations.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        "ix_incidents_org_opened", "incidents", ["organization_id", "opened_at"], unique=False
+        "ix_incidents_org_opened",
+        "incidents",
+        ["organization_id", "opened_at"],
+        unique=False,
     )
     op.create_index(
-        op.f("ix_incidents_organization_id"), "incidents", ["organization_id"], unique=False
+        op.f("ix_incidents_organization_id"),
+        "incidents",
+        ["organization_id"],
+        unique=False,
     )
     op.create_table(
         "subscriptions",
@@ -163,12 +194,16 @@ def upgrade() -> None:
         sa.Column("organization_id", sa.UUID(), nullable=False),
         sa.Column(
             "plan",
-            sa.Enum("free", "essential", "business", "enterprise", name="subscription_plan"),
+            sa.Enum(
+                "free", "essential", "business", "enterprise", name="subscription_plan"
+            ),
             nullable=False,
         ),
         sa.Column(
             "status",
-            sa.Enum("trialing", "active", "past_due", "canceled", name="subscription_status"),
+            sa.Enum(
+                "trialing", "active", "past_due", "canceled", name="subscription_status"
+            ),
             nullable=False,
         ),
         sa.Column("stripe_subscription_id", sa.String(length=255), nullable=True),
@@ -186,11 +221,16 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["organization_id"], ["organizations.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        op.f("ix_subscriptions_organization_id"), "subscriptions", ["organization_id"], unique=True
+        op.f("ix_subscriptions_organization_id"),
+        "subscriptions",
+        ["organization_id"],
+        unique=True,
     )
     op.create_table(
         "suppliers",
@@ -205,7 +245,13 @@ def upgrade() -> None:
         ),
         sa.Column(
             "status",
-            sa.Enum("conforme", "parziale", "non_conforme", "non_valutato", name="supplier_status"),
+            sa.Enum(
+                "conforme",
+                "parziale",
+                "non_conforme",
+                "non_valutato",
+                name="supplier_status",
+            ),
             nullable=False,
         ),
         sa.Column("last_reviewed_at", sa.DateTime(timezone=True), nullable=True),
@@ -215,14 +261,22 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["organization_id"], ["organizations.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        "ix_suppliers_org_status", "suppliers", ["organization_id", "status"], unique=False
+        "ix_suppliers_org_status",
+        "suppliers",
+        ["organization_id", "status"],
+        unique=False,
     )
     op.create_index(
-        op.f("ix_suppliers_organization_id"), "suppliers", ["organization_id"], unique=False
+        op.f("ix_suppliers_organization_id"),
+        "suppliers",
+        ["organization_id"],
+        unique=False,
     )
     op.create_table(
         "incident_notifications",
@@ -241,7 +295,10 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column(
-            "sent_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "sent_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column("recipient", sa.String(length=255), nullable=False),
         sa.Column("content", sa.Text(), nullable=True),
@@ -261,7 +318,13 @@ def upgrade() -> None:
         sa.Column("answers", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column(
             "computed_status",
-            sa.Enum("conforme", "parziale", "non_conforme", "non_valutato", name="supplier_status"),
+            sa.Enum(
+                "conforme",
+                "parziale",
+                "non_conforme",
+                "non_valutato",
+                name="supplier_status",
+            ),
             nullable=False,
         ),
         sa.Column("access_token", sa.String(length=128), nullable=False),
@@ -283,11 +346,13 @@ def upgrade() -> None:
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_index(
-        op.f("ix_supplier_questionnaires_supplier_id"), table_name="supplier_questionnaires"
+        op.f("ix_supplier_questionnaires_supplier_id"),
+        table_name="supplier_questionnaires",
     )
     op.drop_table("supplier_questionnaires")
     op.drop_index(
-        op.f("ix_incident_notifications_incident_id"), table_name="incident_notifications"
+        op.f("ix_incident_notifications_incident_id"),
+        table_name="incident_notifications",
     )
     op.drop_table("incident_notifications")
     op.drop_index(op.f("ix_suppliers_organization_id"), table_name="suppliers")
@@ -301,10 +366,16 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_documents_organization_id"), table_name="documents")
     op.drop_index("ix_documents_org_created", table_name="documents")
     op.drop_table("documents")
-    op.drop_index(op.f("ix_compliance_measures_organization_id"), table_name="compliance_measures")
-    op.drop_index("ix_compliance_measures_org_updated", table_name="compliance_measures")
+    op.drop_index(
+        op.f("ix_compliance_measures_organization_id"), table_name="compliance_measures"
+    )
+    op.drop_index(
+        "ix_compliance_measures_org_updated", table_name="compliance_measures"
+    )
     op.drop_table("compliance_measures")
-    op.drop_index(op.f("ix_assessment_results_organization_id"), table_name="assessment_results")
+    op.drop_index(
+        op.f("ix_assessment_results_organization_id"), table_name="assessment_results"
+    )
     op.drop_index("ix_assessment_results_org_created", table_name="assessment_results")
     op.drop_table("assessment_results")
     # ### end Alembic commands ###

@@ -20,7 +20,6 @@ prefisso "enc::" (mai stati cifrati), quindi non serve un backfill per questa mi
 
 from collections.abc import Sequence
 
-import sqlalchemy as sa
 from alembic import op
 
 revision: str = "a1c9e7f3d2b4"
@@ -30,7 +29,9 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE organizations ALTER COLUMN vat_number TYPE TEXT USING vat_number::text")
+    op.execute(
+        "ALTER TABLE organizations ALTER COLUMN vat_number TYPE TEXT USING vat_number::text"
+    )
     op.execute("ALTER TABLE incidents ALTER COLUMN data TYPE TEXT USING data::text")
 
 

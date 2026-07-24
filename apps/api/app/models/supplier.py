@@ -32,22 +32,30 @@ class Supplier(Base):
     __tablename__ = "suppliers"
     __table_args__ = (Index("ix_suppliers_org_status", "organization_id", "status"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        index=True,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     category: Mapped[str | None] = mapped_column(String(120), nullable=True)
     criticality: Mapped[SupplierCriticality] = mapped_column(
-        Enum(SupplierCriticality, name="supplier_criticality"), default=SupplierCriticality.media
+        Enum(SupplierCriticality, name="supplier_criticality"),
+        default=SupplierCriticality.media,
     )
     status: Mapped[SupplierStatus] = mapped_column(
-        Enum(SupplierStatus, name="supplier_status"), default=SupplierStatus.non_valutato
+        Enum(SupplierStatus, name="supplier_status"),
+        default=SupplierStatus.non_valutato,
     )
     last_reviewed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     organization: Mapped["Organization"] = relationship(back_populates="suppliers")
     questionnaires: Mapped[list["SupplierQuestionnaire"]] = relationship(
@@ -65,16 +73,23 @@ class SupplierQuestionnaire(Base):
 
     __tablename__ = "supplier_questionnaires"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     supplier_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="CASCADE"), index=True
     )
     answers: Mapped[dict] = mapped_column(JSONB, default=dict)
     computed_status: Mapped[SupplierStatus] = mapped_column(
-        Enum(SupplierStatus, name="supplier_status"), default=SupplierStatus.non_valutato
+        Enum(SupplierStatus, name="supplier_status"),
+        default=SupplierStatus.non_valutato,
     )
     access_token: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     supplier: Mapped["Supplier"] = relationship(back_populates="questionnaires")

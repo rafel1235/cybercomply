@@ -1,4 +1,22 @@
-name: CI
+name: CI/CD
+
+# Fase 9 (roadmap tecnica — Infrastruttura e deploy): lint, test, build su ogni push e
+# ogni Pull Request; deploy automatico su staging e (dietro approvazione manuale) su
+# production solo per i push su `main`, e solo se lint/test/build sono tutti passati.
+#
+# Note volutamente honest, non wishful:
+# - Il frontend non ha ancora una suite di test automatici (nessun Jest/Vitest/Playwright
+#   installato in questa sessione di sviluppo): la fase "Test unitari/integrazione" della
+#   roadmap è coperta lato frontend solo da `tsc`/`next lint`/`next build`. I test end-to-end
+#   con Playwright sono un requisito esplicito della Fase 11 (Preparazione al lancio), non
+#   di questa fase.
+# - I job di deploy non fanno nulla di distruttivo se i secret non sono configurati (stesso
+#   principio di degradazione controllata usato in tutto il codice applicativo): loggano e
+#   uscono con successo invece di far fallire la pipeline per un secret mancante.
+# - Questa pipeline non è mai stata eseguita su un vero runner GitHub in questa sessione
+#   (il repository non è mai stato effettivamente pushato): va verificata al primo push
+#   reale. Vedi docs/AMBIENTI.md per la checklist di configurazione one-time (secret,
+#   branch protection, GitHub Environments).
 
 on:
   push:
@@ -7,6 +25,7 @@ on:
 
 jobs:
   backend:
+    name: Backend (lint + test)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -20,10 +39,16 @@ jobs:
         run: pip install -r requirements.txt
       - name: Lint (ruff)
         run: ruff check .
+      - name: Formattazione (black --check)
+        run: black --check .
       - name: Test (pytest)
-        run: pytest --maxfail=1 --disable-warnings
+        # Nessun servizio Postgres da configurare qui: i test avviano da soli un Postgres
+        # incorporato isolato (pgserver, vedi tests/conftest.py) e non toccano mai
+        # DATABASE_URL reale, in CI come in locale.
+        run: pytest --maxfail=1 --disable-warnings --cov=app --cov-report=term-missing
 
   frontend:
+    name: Frontend (lint + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -40,7 +65,48 @@ jobs:
           cache-dependency-path: apps/web/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm exec tsc --noEmit
       - name: Lint
         run: pnpm lint
       - name: Build
         run: pnpm build
+
+  deploy-staging:
+    name: Deploy staging (backend, Render)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
+    steps:
+      - name: Trigger Render deploy hook (staging)
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_STAGING }}" ]; then
+            echo "RENDER_DEPLOY_HOOK_STAGING non configurato: deploy saltato (vedi docs/AMBIENTI.md). Nessun errore: non c'è ancora un servizio Render reale collegato."
+            exit 0
+          fi
+          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_STAGING }}"
+      # Il frontend su Vercel non ha bisogno di un passo di deploy qui: una volta collegato
+      # il repository su vercel.com, Vercel esegue da solo il deploy di produzione ad ogni
+      # push su main e un deploy di anteprima per ogni Pull Request (comportamento nativo,
+      # richiamato esplicitamente dalla roadmap — vedi docs/AMBIENTI.md).
+
+  deploy-production:
+    name: Deploy production (backend, Render)
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # L'approvazione manuale richiesta dalla roadmap ("Deploy su production manuale con
+    # approvazione") si ottiene configurando, una sola volta, l'ambiente GitHub
+    # "production" con almeno un reviewer obbligatorio in Settings → Environments del
+    # repository: GitHub mette in pausa questo job finché non viene approvato a mano,
+    # senza bisogno di altra logica qui. Vedi docs/AMBIENTI.md per i passi esatti.
+    environment: production
+    steps:
+      - name: Trigger Render deploy hook (production)
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_PRODUCTION }}" ]; then
+            echo "RENDER_DEPLOY_HOOK_PRODUCTION non configurato: deploy saltato (vedi docs/AMBIENTI.md). Nessun errore: non c'è ancora un servizio Render reale collegato."
+            exit 0
+          fi
+          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_PRODUCTION }}"

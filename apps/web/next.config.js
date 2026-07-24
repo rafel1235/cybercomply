@@ -50,4 +50,31 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+// Fase 9: withSentryConfig strumenta il bundle (client instrumentation, tag di release,
+// e opzionalmente l'upload dei source map) e ha un costo di build non trascurabile — ha
+// senso pagarlo solo quando Sentry è davvero in uso. Si attiva quando è presente un DSN
+// pubblico reale (NEXT_PUBLIC_SENTRY_DSN): mai configurato in questa sessione di
+// sviluppo, nessun progetto Sentry reale creato, quindi la build usa qui la
+// configurazione semplice, invariata. L'upload dei source map (che richiede una vera
+// chiamata di rete verso l'API di Sentry) è a sua volta condizionato separatamente alla
+// presenza di SENTRY_AUTH_TOKEN, un segreto diverso e più sensibile del DSN pubblico.
+const sentryEnabled = Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN);
+
+if (!sentryEnabled) {
+  module.exports = nextConfig;
+} else {
+  const { withSentryConfig } = require("@sentry/nextjs");
+
+  module.exports = withSentryConfig(nextConfig, {
+    silent: true,
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    widenClientFileUpload: true,
+    // Nessuna route intercettata per il tunneling degli eventi Sentry (evita di
+    // introdurre un endpoint aggiuntivo non richiesto dalla roadmap); i browser con
+    // ad-blocker potrebbero bloccare le chiamate dirette a Sentry, compromesso
+    // accettabile per questa fase.
+    telemetry: false,
+    sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  });
+}

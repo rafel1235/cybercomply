@@ -1,0 +1,135 @@
+# Configurazione Render (Fase 9 — roadmap tecnica: "Hosting backend: Railway EU o Render
+# EU o Fly.io EU"). Due servizi separati per staging e production, come richiesto dalla
+# roadmap ("Ogni ambiente ha le sue variabili d'ambiente separate", "Database separato per
+# staging e production"): usano lo stesso repository e lo stesso branch (`main`), ma
+# ciascuno ha le proprie variabili d'ambiente e va puntato a un progetto Supabase diverso
+# (istruzioni in docs/AMBIENTI.md).
+#
+# `autoDeploy: false` su entrambi, deliberatamente: il deploy non parte da solo a ogni
+# push su `main`, ma solo dopo che la pipeline CI (.github/workflows/ci.yml) ha superato
+# lint e test, tramite Deploy Hook (vedi docs/AMBIENTI.md per come generarlo e dove
+# incollarlo nei secret di GitHub). Il servizio "production" va inoltre dietro
+# un'approvazione manuale su GitHub (GitHub Environment "production" con reviewer
+# obbligatori, da configurare una volta sola nelle impostazioni del repository).
+#
+# Questo file descrive l'infrastruttura desiderata ma non è mai stato applicato a un
+# account Render reale in questa sessione di sviluppo: nessun servizio Render è stato
+# creato, nessuna chiamata alle sue API è mai stata fatta. Va verificato contro la
+# documentazione Render corrente al momento del primo deploy reale.
+
+services:
+  - type: web
+    name: cybercomplyit-api-staging
+    runtime: python
+    region: frankfurt
+    plan: starter
+    branch: main
+    rootDir: apps/api
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: false
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ENVIRONMENT
+        value: staging
+      - key: API_V1_PREFIX
+        value: /api/v1
+      - key: ALLOWED_ORIGINS
+        value: https://staging.cybercomplyit.it
+      - key: FRONTEND_BASE_URL
+        value: https://staging.cybercomplyit.it
+      - key: LOGIN_RATE_LIMIT
+        value: 10/15minutes
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-5
+      - key: ANTHROPIC_INPUT_COST_PER_MTOK
+        value: "0"
+      - key: ANTHROPIC_OUTPUT_COST_PER_MTOK
+        value: "0"
+      - key: EMAIL_FROM_ADDRESS
+        value: CyberComplyIT (staging) <noreply@staging.cybercomplyit.it>
+      # Segreti: valore impostato a mano nella dashboard Render, mai in questo file
+      # né nel repository (sync: false = "Render me lo chiede, non lo sincronizza da qui").
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_ID_ESSENTIAL
+        sync: false
+      - key: STRIPE_PRICE_ID_BUSINESS
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false
+
+  - type: web
+    name: cybercomplyit-api-production
+    runtime: python
+    region: frankfurt
+    plan: starter
+    branch: main
+    rootDir: apps/api
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: false
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: API_V1_PREFIX
+        value: /api/v1
+      - key: ALLOWED_ORIGINS
+        value: https://cybercomplyit.it,https://www.cybercomplyit.it
+      - key: FRONTEND_BASE_URL
+        value: https://cybercomplyit.it
+      - key: LOGIN_RATE_LIMIT
+        value: 10/15minutes
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-5
+      - key: ANTHROPIC_INPUT_COST_PER_MTOK
+        sync: false
+      - key: ANTHROPIC_OUTPUT_COST_PER_MTOK
+        sync: false
+      - key: EMAIL_FROM_ADDRESS
+        value: CyberComplyIT <noreply@cybercomplyit.it>
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_ID_ESSENTIAL
+        sync: false
+      - key: STRIPE_PRICE_ID_BUSINESS
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false

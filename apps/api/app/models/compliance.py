@@ -3,7 +3,16 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,17 +45,24 @@ class ComplianceMeasure(Base):
 
     __tablename__ = "compliance_measures"
     __table_args__ = (
-        UniqueConstraint("organization_id", "measure_id", name="uq_compliance_measure_per_org"),
+        UniqueConstraint(
+            "organization_id", "measure_id", name="uq_compliance_measure_per_org"
+        ),
         Index("ix_compliance_measures_org_updated", "organization_id", "updated_at"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        index=True,
     )
     measure_id: Mapped[str] = mapped_column(String(80), nullable=False)
     status: Mapped[MeasureStatus] = mapped_column(
-        Enum(MeasureStatus, name="measure_status"), default=MeasureStatus.non_applicabile
+        Enum(MeasureStatus, name="measure_status"),
+        default=MeasureStatus.non_applicabile,
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
@@ -56,5 +72,7 @@ class ComplianceMeasure(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
-    organization: Mapped["Organization"] = relationship(back_populates="compliance_measures")
+    organization: Mapped["Organization"] = relationship(
+        back_populates="compliance_measures"
+    )
     updated_by_user: Mapped["User | None"] = relationship()

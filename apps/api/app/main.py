@@ -11,9 +11,11 @@ from app.api.v1.api import api_router
 from app.core.config import get_settings
 from app.core.logging import RequestLoggingMiddleware, logger
 from app.core.middleware import SecurityHeadersMiddleware
+from app.core.monitoring import capture_exception, configure_sentry
 from app.core.rate_limit import limiter
 
 settings = get_settings()
+configure_sentry(settings)
 
 app = FastAPI(
     title="CyberComplyIT API",
@@ -28,7 +30,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 @app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+async def http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
     """Normalizza tutte le HTTPException (404, 403, ecc.) in un formato JSON coerente."""
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
@@ -54,6 +58,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     log strutturati (mai perso, solo non esposto al client).
     """
     logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc!r}")
+    capture_exception(exc)
     detail = str(exc) if not settings.is_production else "Errore interno del server"
     return JSONResponse(status_code=500, content={"detail": detail})
 

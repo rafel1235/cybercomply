@@ -32,19 +32,31 @@ class AssessmentResult(Base):
     """
 
     __tablename__ = "assessment_results"
-    __table_args__ = (Index("ix_assessment_results_org_created", "organization_id", "created_at"),)
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    __table_args__ = (
+        Index("ix_assessment_results_org_created", "organization_id", "created_at"),
     )
-    nis2_category: Mapped[Nis2Category] = mapped_column(Enum(Nis2Category, name="nis2_category"))
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        index=True,
+    )
+    nis2_category: Mapped[Nis2Category] = mapped_column(
+        Enum(Nis2Category, name="nis2_category")
+    )
     cra_in_scope: Mapped[bool] = mapped_column(Boolean, default=False)
     answers: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
-    organization: Mapped["Organization"] = relationship(back_populates="assessment_results")
+    organization: Mapped["Organization"] = relationship(
+        back_populates="assessment_results"
+    )
     created_by_user: Mapped["User | None"] = relationship()

@@ -56,10 +56,26 @@ class Settings(BaseSettings):
     anthropic_input_cost_per_mtok: float = 0.0
     anthropic_output_cost_per_mtok: float = 0.0
 
-    # Storage locale dei PDF generati, in attesa dell'integrazione con Supabase Storage
-    # (Fase 5/6). Directory ignorata da git (vedi .gitignore) perché contiene solo output
-    # rigenerabile, non sorgenti.
+    # Storage locale dei PDF generati: ripiego usato quando Supabase Storage non è
+    # configurato (vedi supabase_storage_configured più sotto), e comportamento di
+    # default finché non lo sarà (mai stato configurato in questa sessione di sviluppo).
+    # Directory ignorata da git (vedi .gitignore) perché contiene solo output
+    # rigenerabile, non sorgenti. ATTENZIONE (Fase 9): su un host con filesystem
+    # effimero (es. Render, che azzera il disco locale ad ogni deploy/riavvio), questo
+    # storage non sopravvive — è per questo che la roadmap chiede esplicitamente
+    # Supabase Storage o S3 in produzione.
     local_storage_dir: str = "storage"
+
+    # Nome del bucket su Supabase Storage (Fase 9 — "Storage file (PDF generati):
+    # Supabase Storage o AWS S3"). Deve esistere già sul progetto Supabase reale, questa
+    # piattaforma non lo crea da sola.
+    supabase_storage_bucket: str = "documents"
+
+    @property
+    def supabase_storage_configured(self) -> bool:
+        """Riusa le stesse credenziali della Admin API (Fase 8): la Storage API di
+        Supabase richiede anch'essa la service role key, non l'anon key."""
+        return self.supabase_admin_configured
 
     # --- Stripe (Fase 6 — pagamenti e piani) ---
     stripe_secret_key: str = ""
@@ -104,6 +120,13 @@ class Settings(BaseSettings):
         return bool(
             self.field_encryption_key
         ) and not self.field_encryption_key.startswith("replace-with")
+
+    # --- Sentry (Fase 9 — monitoraggio produzione: error tracking) ---
+    sentry_dsn: str = ""
+
+    @property
+    def sentry_configured(self) -> bool:
+        return bool(self.sentry_dsn) and not self.sentry_dsn.startswith("replace-with")
 
     @property
     def allowed_origins_list(self) -> list[str]:

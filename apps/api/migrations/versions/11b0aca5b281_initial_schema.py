@@ -26,7 +26,9 @@ def upgrade() -> None:
         sa.Column("vat_number", sa.String(length=32), nullable=True),
         sa.Column("sector", sa.String(length=120), nullable=True),
         sa.Column("employee_count", sa.Integer(), nullable=True),
-        sa.Column("annual_revenue_eur", sa.Numeric(precision=14, scale=2), nullable=True),
+        sa.Column(
+            "annual_revenue_eur", sa.Numeric(precision=14, scale=2), nullable=True
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -46,7 +48,9 @@ def upgrade() -> None:
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("email", sa.String(length=320), nullable=False),
         sa.Column("full_name", sa.String(length=255), nullable=True),
-        sa.Column("failed_login_count", sa.Integer(), server_default="0", nullable=False),
+        sa.Column(
+            "failed_login_count", sa.Integer(), server_default="0", nullable=False
+        ),
         sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "created_at",
@@ -78,7 +82,9 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["organization_id"], ["organizations.id"], ondelete="SET NULL"
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -87,7 +93,9 @@ def upgrade() -> None:
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("organization_id", sa.UUID(), nullable=False),
         sa.Column("invited_email", sa.String(length=320), nullable=False),
-        sa.Column("role", sa.Enum("admin", "viewer", name="organization_role"), nullable=False),
+        sa.Column(
+            "role", sa.Enum("admin", "viewer", name="organization_role"), nullable=False
+        ),
         sa.Column("invited_by", sa.UUID(), nullable=False),
         sa.Column("token", sa.String(length=128), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
@@ -102,7 +110,9 @@ def upgrade() -> None:
             ["invited_by"],
             ["users.id"],
         ),
-        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["organization_id"], ["organizations.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("token"),
     )
@@ -110,11 +120,18 @@ def upgrade() -> None:
         "organization_members",
         sa.Column("user_id", sa.UUID(), nullable=False),
         sa.Column("organization_id", sa.UUID(), nullable=False),
-        sa.Column("role", sa.Enum("admin", "viewer", name="organization_role"), nullable=False),
         sa.Column(
-            "joined_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "role", sa.Enum("admin", "viewer", name="organization_role"), nullable=False
         ),
-        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.Column(
+            "joined_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["organization_id"], ["organizations.id"], ondelete="CASCADE"
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("user_id", "organization_id"),
     )
