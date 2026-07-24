@@ -267,7 +267,108 @@ sessione sostituite), non email inviate da CyberComplyIT. Personalizzarle grafic
 richiede configurare l'SMTP custom sul progetto Supabase reale (dashboard, non codice):
 da fare quando il progetto Supabase reale sarà collegato.
 
+## Fase 8 — Sicurezza del prodotto — ✅ completata e verificata
+- [x] **Header di sicurezza HTTP**: `SecurityHeadersMiddleware` (backend) esteso con
+      `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`
+      (CSP `default-src 'none'` già presente da Fase 1, corretta per un'API JSON pura).
+      `next.config.js` (frontend) ora imposta `poweredByHeader: false`, una CSP costruita
+      dinamicamente dagli URL Supabase/API effettivi, `Permissions-Policy` e HSTS. Aggiunto
+      `robots.txt` che esclude le route autenticate (`/dashboard`, `/settings`). Verificato
+      via audit del codice che non ci sono query SQL costruite per concatenazione di
+      stringhe (solo ORM parametrizzato) né `dangerouslySetInnerHTML` nel frontend.
+- [x] **Cifratura a riposo** dei dati sensibili esplicitamente citati dalla roadmap: P.IVA
+      (`organizations.vat_number`) e dati incidente (`incidents.data`). Cifratura simmetrica
+      Fernet (`cryptography`, già dipendenza transitiva) applicata in modo trasparente via
+      un `TypeDecorator` SQLAlchemy (`app/db/encrypted_types.py`): nessuna route, schema o
+      test esistente ha dovuto cambiare per continuare a leggere/scrivere questi campi in
+      chiaro lato applicazione. Un prefisso `enc::` distingue i valori cifrati da quelli
+      scritti prima di questa fase (retrocompatibile, nessun backfill necessario). Se
+      `FIELD_ENCRYPTION_KEY` non è configurata, i valori vengono salvati in chiaro con un
+      warning nei log — mai generata una chiave effimera, per non rischiare di rendere
+      irrecuperabili per sempre dati già cifrati con una chiave persa.
+- [x] **GDPR — Art. 20, esporta i miei dati**: `GET /gdpr/export` restituisce un export
+      completo e strutturato di tutti i dati riconducibili all'utente autenticato — il
+      proprio profilo e, per ciascuna organizzazione di cui è membro, membri, assessment,
+      misure di compliance, documenti, incidenti (con le scadenze di notifica calcolate),
+      fornitori e audit log. Riusa le stesse funzioni di serializzazione (`_to_out`) già
+      usate dai rispettivi endpoint, invece di duplicarle, così l'export non può divergere
+      dal formato mostrato nell'app. I valori cifrati (P.IVA, dati incidente) tornano in
+      chiaro nell'export, come in ogni altra lettura autenticata. L'export stesso genera un
+      evento di audit (`gdpr.data_exported`). Frontend: sezione "Privacy e dati" nella
+      pagina Profilo con un pulsante che scarica l'export come file JSON (stesso pattern già
+      usato per il download dei PDF dei documenti — nessuna navigazione, link temporaneo in
+      memoria).
+- [x] **GDPR — Art. 17, cancella il mio account**: `DELETE /gdpr/account` esegue subito
+      (non in coda, ben entro i 30 giorni previsti dalla roadmap) la cancellazione
+      dell'account. Per ogni organizzazione di cui l'utente è membro: se ne è l'unico
+      membro, l'intera organizzazione viene cancellata a cascata (membri, assessment,
+      misure, documenti, incidenti, fornitori, abbonamento); se è l'unico admin con altri
+      membri, l'operazione viene rifiutata (400) chiedendo di promuovere prima un altro
+      admin — stessa regola già applicata da `DELETE /organization/members/{user_id}`;
+      altrimenti viene rimossa solo la sua iscrizione, organizzazione e altri membri
+      restano intatti. Tutte le organizzazioni sono validate prima di cancellare
+      qualunque cosa, per non lasciare mai una cancellazione a metà. L'eventuale
+      cancellazione dell'utente su Supabase Auth (Admin API) è "best effort": non blocca
+      mai la cancellazione dello specchio locale, l'unica parte realmente sotto il
+      controllo diretto di questa API (mai stata configurata con credenziali reali in
+      questa sessione, vedi nota più sotto). L'audit log delle organizzazioni cancellate
+      non viene perso (`organization_id` va a `NULL` via `ondelete="SET NULL"`, i record
+      restano per la conservazione minima di 12 mesi). Frontend: sezione "Zona
+      pericolosa" nella pagina Profilo, dietro una conferma esplicita (l'utente deve
+      digitare "ELIMINA"), che poi effettua il logout e reindirizza al login.
+- [x] **Documenti GDPR**: `docs/REGISTRO_TRATTAMENTI.md`, un vero Registro delle Attività
+      di Trattamento (Art. 30) ricostruito dal modello dati reale (non un template) —
+      categorie di interessati e dati, finalità e basi giuridiche, i 4 fornitori esterni
+      che trattano dati per conto di CyberComplyIT (Supabase, Stripe, Resend, Anthropic)
+      con le note sui DPA e i trasferimenti extra-UE ancora da verificare legalmente,
+      misure di sicurezza, tempi di conservazione, ed esplicita valutazione (non
+      decisione) sulla necessità di un DPO. Pagina pubblica `/cookie-policy` (frontend):
+      onesta, non generica — spiega perché non serve un banner di consenso (nessuna
+      libreria di analytics/tracciamento nel codice, verificato), l'unico cookie è quello
+      di sessione tecnico di Supabase Auth, e chiarisce che Stripe (pagine hostate,
+      dominio esterno) ha una propria informativa. Linkata dal footer di tutte le pagine
+      pubbliche di autenticazione (`AuthLayout`).
+
+**Nota**: come da roadmap, alcuni requisiti di Fase 8 non sono task di codice e restano
+esplicitamente fuori da questa sessione — vedi la nota nella sezione "Fasi successive" in
+fondo a questo documento, e il §3 di `docs/REGISTRO_TRATTAMENTI.md` per l'elenco completo
+lato GDPR (Privacy Policy/Cookie Policy vere e proprie con un avvocato, DPA con i
+fornitori, verifica dei trasferimenti extra-UE, decisione sul DPO, GitHub Secret
+Scanning).
+
 ## Verifica eseguita (non solo scritta: testata davvero)
+- **Verifica finale Fase 8**: migration esistenti riapplicate da zero su Postgres reale
+  più la nuova migration di cifratura (`vat_number`/`incidents.data` da tipo nativo a
+  `TEXT` opaco), **199/199 test automatici passati** (181 precedenti + 3 header di
+  sicurezza + 10 cifratura campi + 2 export GDPR + 6 cancellazione account GDPR —
+  quest'ultimi verificano end-to-end i tre esiti possibili: organizzazione cancellata per
+  intero, iscrizione rimossa con organizzazione intatta, operazione rifiutata se unico
+  admin con altri membri, oltre agli eventi di audit generati e all'inutilizzabilità del
+  token dopo la cancellazione). Copertura (`pytest-cov`): **96% (2219 statement, 82 non
+  coperti)** — le righe scoperte sono quasi tutte rami di errore secondari o percorsi che
+  richiedono credenziali reali mai configurate in questa sessione (`app/services/
+  supabase_admin.py` al 61% è il caso più basso, per lo stesso motivo di `ai_client.py`
+  in Fase 5: la vera chiamata HTTP a un servizio esterno non configurato non è mai
+  esercitata). Un bug scoperto e corretto durante lo sviluppo dei test di cancellazione
+  account: la proprietà `supabase_admin_configured` considerava configurato l'URL/la
+  chiave segnaposto di `.env.example`, causando un tentativo di vera chiamata HTTP
+  (fallita per la configurazione di rete della sandbox) invece di saltare l'operazione
+  come da progettazione — corretto con lo stesso guard "not startswith
+  replace-with/YOUR-PROJECT" già usato per Stripe/Resend/cifratura, e reso
+  `delete_auth_user` robusto anche a eccezioni impreviste (non solo `httpx.HTTPError`),
+  coerentemente con la garanzia "mai un'eccezione" del resto del modulo. Lint (`ruff`)
+  pulito su tutto `app/` e `tests/`, formattazione (`black --check`) pulita su tutti i
+  file nuovi/modificati di questa fase (alcuni file di modelli invariati da fasi
+  precedenti risultano non formattati secondo la versione attuale di `black`: non
+  toccati, stessa scelta già fatta in Fase 7 per non introdurre modifiche estranee al
+  perimetro della fase).
+- Frontend Fase 8: `tsc --noEmit` pulito, `next lint` pulito, `next build` completata con
+  successo — **19 route** (le 18 precedenti, invariate, più la nuova `/cookie-policy`
+  pubblica e statica; l'export e la cancellazione account GDPR sono sezioni aggiunte alla
+  pagina `/settings/profile` esistente, non nuove route).
+- Diff completo tra la copia di verifica Linux e la cartella consegnata
+  (`piattaforma/apps/api` e `piattaforma/apps/web`): nessuna differenza, file per file,
+  su tutti i file toccati in questa fase.
 - Backend Fase 7: migration esistenti riapplicate da zero su Postgres reale (nessuna
   nuova tabella in questa fase), **178/178 test automatici passati** (165 precedenti +
   13 nuovi: redenzione invito valido/email sbagliata/scaduto/già accettato, anteprima
@@ -360,12 +461,15 @@ da fare quando il progetto Supabase reale sarà collegato.
 - Repository Git locale creato con commit iniziale in questa cartella.
 
 ## Fasi successive (non ancora iniziate)
-Fase 8 (sicurezza estesa), Fase 9 (infrastruttura/deploy — anche per collegare
-`scripts/send_scheduled_emails.py` a un vero cron giornaliero invece dell'esecuzione
-manuale attuale, e per spostare il downgrade trial→Free su quel cron invece del calcolo
-lazy attuale), Fase 10 (performance), Fase 11 (lancio) — da eseguire un modulo alla volta,
-come da preferenza espressa. Prima del lancio commerciale vanno anche: impostata una vera
+Fase 9 (infrastruttura/deploy — anche per collegare `scripts/send_scheduled_emails.py` a
+un vero cron giornaliero invece dell'esecuzione manuale attuale, e per spostare il
+downgrade trial→Free su quel cron invece del calcolo lazy attuale), Fase 10
+(performance), Fase 11 (lancio) — da eseguire un modulo alla volta, come da preferenza
+espressa. Prima del lancio commerciale vanno anche: impostata una vera
 `ANTHROPIC_API_KEY` e validati i prompt con un esperto legale (Fase 5); impostate le
 chiavi Stripe reali ed eseguito un ciclo di checkout/webhook contro il suo ambiente di
 test (Fase 6); impostata una vera `RESEND_API_KEY` con dominio mittente verificato
-SPF/DKIM/DMARC (Fase 7).
+SPF/DKIM/DMARC (Fase 7); tutti i compiti non tecnici elencati nella nota di chiusura della
+Fase 8 e nel §3 di `docs/REGISTRO_TRATTAMENTI.md` (Privacy Policy/Cookie Policy con un
+avvocato, DPA con Supabase/Stripe/Resend/Anthropic, verifica dei trasferimenti extra-UE,
+decisione sul DPO, GitHub Secret Scanning una volta pubblicato il repository).

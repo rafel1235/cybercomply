@@ -7,6 +7,7 @@ from app.api.v1.routes import (
     billing,
     compliance,
     documents,
+    gdpr,
     health,
     incidents,
     organization,
@@ -28,3 +29,4 @@ api_router.include_router(public_questionnaires.router)
 api_router.include_router(public_invites.router)
 api_router.include_router(audit.router)
 api_router.include_router(billing.router)
+api_router.include_router(gdpr.router)

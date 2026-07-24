@@ -1,0 +1,9 @@
+# Fase 8 (roadmap tecnica): esclude dall'indicizzazione le route autenticate.
+User-agent: *
+Disallow: /dashboard
+Disallow: /settings
+Allow: /$
+Allow: /login
+Allow: /register
+Allow: /forgot-password
+Allow: /questionario

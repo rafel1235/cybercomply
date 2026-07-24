@@ -4,10 +4,11 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.db.encrypted_types import EncryptedJSON
 
 if TYPE_CHECKING:
     from app.models.organization import Organization
@@ -42,18 +43,30 @@ class Incident(Base):
     __tablename__ = "incidents"
     __table_args__ = (Index("ix_incidents_org_opened", "organization_id", "opened_at"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        index=True,
     )
     reference_code: Mapped[str] = mapped_column(String(32), nullable=False)
     incident_type: Mapped[str] = mapped_column(String(120), nullable=False)
     status: Mapped[IncidentStatus] = mapped_column(
         Enum(IncidentStatus, name="incident_status"), default=IncidentStatus.aperto
     )
-    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    data: Mapped[dict] = mapped_column(JSONB, default=dict)
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Cifrato a riposo (Fase 8): "dati incidenti" esplicitamente richiesti dalla roadmap
+    # tra i dati sensibili da proteggere (spesso contiene descrizioni libere di un
+    # data breach o di un attacco in corso). Non più interrogabile con operatori JSON
+    # lato SQL: nessun codice esistente lo fa (solo lettura/scrittura del blob intero).
+    data: Mapped[dict] = mapped_column(EncryptedJSON(), default=dict)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -71,14 +84,18 @@ class IncidentNotification(Base):
 
     __tablename__ = "incident_notifications"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     incident_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("incidents.id", ondelete="CASCADE"), index=True
     )
     phase: Mapped[NotificationPhase] = mapped_column(
         Enum(NotificationPhase, name="notification_phase")
     )
-    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    sent_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     recipient: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
 

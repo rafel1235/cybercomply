@@ -28,6 +28,21 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     supabase_jwt_secret: str = ""
 
+    @property
+    def supabase_admin_configured(self) -> bool:
+        """Serve solo per la cancellazione account (GDPR Art. 17, Fase 8): la Admin API
+        di Supabase Auth richiede la service role key, non l'anon key usata dal resto
+        dell'app. Come per Stripe/Resend/cifratura, i valori segnaposto di `.env.example`
+        (mai sostituiti con credenziali reali in questa sessione) non contano come
+        configurati, altrimenti si tenterebbe una vera chiamata HTTP verso un URL finto.
+        """
+        return (
+            bool(self.supabase_url)
+            and not self.supabase_url.startswith("https://YOUR-PROJECT")
+            and bool(self.supabase_service_role_key)
+            and not self.supabase_service_role_key.startswith("replace-with")
+        )
+
     login_rate_limit: str = "10/15minutes"
 
     anthropic_api_key: str = ""
@@ -76,6 +91,19 @@ class Settings(BaseSettings):
         return bool(self.resend_api_key) and not self.resend_api_key.startswith(
             "replace-with"
         )
+
+    # --- Cifratura campi sensibili a riposo (Fase 8) ---
+    # Chiave Fernet (32 byte urlsafe-base64): generarne una reale con
+    # `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+    # ATTENZIONE: perdere questa chiave rende illeggibili per sempre i dati già cifrati
+    # con essa — conservarla con la stessa cura di una password di database, mai nel repo.
+    field_encryption_key: str = ""
+
+    @property
+    def field_encryption_configured(self) -> bool:
+        return bool(
+            self.field_encryption_key
+        ) and not self.field_encryption_key.startswith("replace-with")
 
     @property
     def allowed_origins_list(self) -> list[str]:
