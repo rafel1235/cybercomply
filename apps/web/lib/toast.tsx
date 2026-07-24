@@ -36,10 +36,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
+      {/* Fase 10 (accessibilità — WCAG 4.1.3 "Status Messages"): senza role/aria-live, un
+          utente di screen reader non viene mai informato che un'azione è riuscita o
+          fallita, perché il toast compare e scompare senza mai ricevere il focus.
+          `role="alert"` (implica aria-live="assertive") per gli errori, da annunciare
+          subito; `role="status"` (aria-live="polite") per successo/info, meno urgente. */}
       <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((t) => (
           <div
             key={t.id}
+            role={t.type === "error" ? "alert" : "status"}
             className={`pointer-events-auto rounded-md px-4 py-3 text-sm font-medium shadow-lg ${TOAST_STYLES[t.type]}`}
           >
             {t.message}

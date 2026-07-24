@@ -142,13 +142,13 @@ export default function BillingSettingsPage() {
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <p className="text-xs font-medium uppercase text-slate-400">Documenti AI</p>
+            <p className="text-xs font-medium uppercase text-slate-500">Documenti AI</p>
             <p className="text-sm text-slate-700">
               {formatQuota(usage.documents_generated_this_month, entitlements.max_ai_documents_per_month)}
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-slate-400">Utenti</p>
+            <p className="text-xs font-medium uppercase text-slate-500">Utenti</p>
             <p className="text-sm text-slate-700">
               {usage.users_count}
               {entitlements.max_users !== null ? ` / ${entitlements.max_users}` : " (illimitati)"}

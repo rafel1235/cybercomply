@@ -104,7 +104,7 @@ export default function IncidentsPage() {
               value={incidentType}
               onChange={(e) => setIncidentType(e.target.value)}
               placeholder="Es. accesso non autorizzato, ransomware, data breach…"
-              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none"
+              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
@@ -113,7 +113,7 @@ export default function IncidentsPage() {
               value={descrizione}
               onChange={(e) => setDescrizione(e.target.value)}
               rows={3}
-              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none"
+              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
             />
           </label>
           <p className="text-xs text-slate-500">
@@ -140,10 +140,12 @@ export default function IncidentsPage() {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-2">
+        <div className="flex gap-2" role="group" aria-label="Filtra per stato">
           {STATUS_FILTERS.map(([value, label]) => (
             <button
               key={value}
+              type="button"
+              aria-pressed={statusFilter === value}
               onClick={() => setStatusFilter(value)}
               className={`rounded-full px-3 py-1 text-sm font-medium ${
                 statusFilter === value
@@ -157,10 +159,11 @@ export default function IncidentsPage() {
         </div>
         <input
           type="text"
+          aria-label="Cerca incidenti per tipologia o codice"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Cerca per tipologia o codice…"
-          className="ml-auto w-64 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+          className="ml-auto w-64 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
         />
       </div>
 

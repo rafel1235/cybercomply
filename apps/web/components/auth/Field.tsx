@@ -25,7 +25,7 @@ export function Field({
         minLength={minLength}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-brand-blue focus:outline-none disabled:bg-slate-100 disabled:text-slate-500"
+        className="rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30 disabled:bg-slate-100 disabled:text-slate-500"
       />
     </label>
   );

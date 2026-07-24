@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -8,6 +8,7 @@ from app.api.deps import (
     get_db,
     require_admin,
 )
+from app.core.pagination import DEFAULT_LIMIT, apply_pagination
 from app.models.audit_log import AuditLog
 from app.models.compliance import ComplianceMeasure, MeasureStatus
 from app.schemas.compliance import (
@@ -202,20 +203,24 @@ def get_score(
 
 @router.get("/history", response_model=list[ComplianceHistoryPoint])
 def get_history(
+    response: Response,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
     membership: CurrentMembership = Depends(get_current_membership),
     db: Session = Depends(get_db),
 ) -> list[ComplianceHistoryPoint]:
     """Storico del punteggio di compliance, ricostruito dagli eventi di audit
-    'compliance.score_snapshot' registrati ad ogni aggiornamento di misura."""
-    events = (
-        db.query(AuditLog)
-        .filter(
-            AuditLog.organization_id == membership.organization.id,
-            AuditLog.action == "compliance.score_snapshot",
-        )
-        .order_by(AuditLog.created_at.asc())
-        .all()
+    'compliance.score_snapshot' registrati ad ogni aggiornamento di misura. Paginato
+    (Fase 10 — performance): restituisce i punti più recenti (mai un array illimitato),
+    ma sempre in ordine cronologico crescente (richiesto dal grafico), quindi la query è
+    ordinata a ritroso per prendere gli ultimi `limit` e poi reinvertita in Python."""
+    query = db.query(AuditLog).filter(
+        AuditLog.organization_id == membership.organization.id,
+        AuditLog.action == "compliance.score_snapshot",
     )
+    query = query.order_by(AuditLog.created_at.desc())
+    query = apply_pagination(query, response, limit=limit, offset=offset)
+    events = list(reversed(query.all()))
     return [
         ComplianceHistoryPoint(
             recorded_at=e.created_at, score_percent=e.details.get("score_percent", 0.0)

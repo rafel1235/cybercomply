@@ -82,7 +82,7 @@ export default function CookiePolicyPage() {
         </p>
       </section>
 
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-slate-500">
         Questa pagina descrive esclusivamente i cookie. Per l&apos;informativa completa
         sul trattamento dei dati personali, consulta la Privacy Policy (in preparazione).
       </p>

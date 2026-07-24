@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -95,9 +96,9 @@ export default function TeamSettingsPage() {
             {seatsLimit !== null && (
               <>
                 {" · "}
-                <a href="/settings/billing" className="text-brand-blue hover:underline">
+                <Link href="/settings/billing" className="text-brand-blue hover:underline">
                   passa a un piano superiore
-                </a>
+                </Link>
               </>
             )}
           </p>
@@ -120,7 +121,7 @@ export default function TeamSettingsPage() {
                 <td className="px-4 py-2 text-slate-700">
                   {member.full_name ?? member.email}
                   {member.email === currentEmail && (
-                    <span className="ml-2 text-xs text-slate-400">(tu)</span>
+                    <span className="ml-2 text-xs text-slate-500">(tu)</span>
                   )}
                 </td>
                 <td className="px-4 py-2">
@@ -154,22 +155,24 @@ export default function TeamSettingsPage() {
           {atSeatLimit && (
             <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
               Hai raggiunto il numero massimo di posti del piano {PLAN_LABELS[subscription!.plan]}.{" "}
-              <a href="/settings/billing" className="font-medium text-brand-blue hover:underline">
+              <Link href="/settings/billing" className="font-medium text-brand-blue hover:underline">
                 Passa a un piano superiore
-              </a>{" "}
+              </Link>{" "}
               per invitare altri collaboratori.
             </p>
           )}
           <div className="flex flex-wrap gap-3">
             <input
               type="email"
+              aria-label="Email del collaboratore da invitare"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               placeholder="email@azienda.it"
               required
-              className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+              className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
             />
             <select
+              aria-label="Ruolo del collaboratore da invitare"
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value)}
               className="rounded-md border border-slate-300 px-3 py-2 text-sm"

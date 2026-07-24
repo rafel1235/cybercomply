@@ -137,9 +137,9 @@ function MeasuresTab() {
         <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
           Il piano Free mostra le prime 3 misure in sola lettura, come assaggio del
           tracker.{" "}
-          <a href="/settings/billing" className="font-medium text-brand-blue hover:underline">
+          <Link href="/settings/billing" className="font-medium text-brand-blue hover:underline">
             Passa a Essential
-          </a>{" "}
+          </Link>{" "}
           per sbloccare tutte le 15 misure e poterle modificare.
         </p>
       )}
@@ -147,7 +147,7 @@ function MeasuresTab() {
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-sm text-slate-500">Punteggio attuale</p>
           <p className="text-2xl font-bold text-brand-dark">{scoreQuery.data.score_percent}%</p>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             {scoreQuery.data.measures_conformi} conformi · {scoreQuery.data.measures_parziali} parziali ·{" "}
             {scoreQuery.data.measures_non_conformi} non conformi ·{" "}
             {scoreQuery.data.measures_non_applicabili} non applicabili
@@ -157,6 +157,7 @@ function MeasuresTab() {
 
       <div className="flex flex-wrap gap-3">
         <select
+          aria-label="Filtra per categoria"
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -169,6 +170,7 @@ function MeasuresTab() {
           ))}
         </select>
         <select
+          aria-label="Filtra per stato"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -193,7 +195,7 @@ function MeasuresTab() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="font-medium text-slate-800">{m.label}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     {complianceCategoryOf(m.measure_id)} · {m.normative_reference}
                   </p>
                 </div>
@@ -202,10 +204,11 @@ function MeasuresTab() {
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <select
+                  aria-label={`Stato di conformità per ${m.label}`}
                   value={m.status}
                   onChange={(e) => handleStatusChange(m.measure_id, e.target.value, m.note)}
                   disabled={readOnly}
-                  className="rounded-md border border-slate-300 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+                  className="rounded-md border border-slate-300 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
                 >
                   {Object.entries(MEASURE_STATUS_LABELS).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -213,7 +216,7 @@ function MeasuresTab() {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500">
                   Ultimo aggiornamento: {formatDateTime(m.updated_at)}
                 </p>
                 <button
@@ -226,6 +229,7 @@ function MeasuresTab() {
               </div>
 
               <textarea
+                aria-label={`Note per ${m.label}`}
                 placeholder='Note (es. "abbiamo il MFA attivo su Office 365 dal...")'
                 value={noteDrafts[m.measure_id] ?? m.note ?? ""}
                 onChange={(e) =>
@@ -234,7 +238,7 @@ function MeasuresTab() {
                 onBlur={() => handleNoteSave(m.measure_id, m.status)}
                 rows={2}
                 disabled={readOnly}
-                className="mt-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+                className="mt-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
               />
 
               {historyOpenFor === m.measure_id && (
@@ -244,7 +248,7 @@ function MeasuresTab() {
                       (e) => e.action === "compliance.measure_updated" && e.details.measure_id === m.measure_id
                     );
                     if (entries.length === 0) {
-                      return <p className="text-xs text-slate-400">Nessuna modifica registrata.</p>;
+                      return <p className="text-xs text-slate-500">Nessuna modifica registrata.</p>;
                     }
                     return (
                       <ul className="flex flex-col gap-1">
@@ -336,6 +340,7 @@ function DocumentsTab() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4">
         <select
+          aria-label="Tipo di documento da generare"
           value={selectedType}
           onChange={(e) => setSelectedType(e.target.value)}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -359,9 +364,9 @@ function DocumentsTab() {
             {quotaReached && (
               <>
                 {" · "}
-                <a href="/settings/billing" className="font-medium text-brand-blue hover:underline">
+                <Link href="/settings/billing" className="font-medium text-brand-blue hover:underline">
                   aumenta il limite
-                </a>
+                </Link>
               </>
             )}
           </span>
@@ -389,7 +394,7 @@ function DocumentsTab() {
                       <Badge label="Segnaposto" variant="neutral" />
                     )}
                   </div>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     Versione {doc.version} · generato il {formatDateTime(doc.created_at)}
                   </p>
                 </div>

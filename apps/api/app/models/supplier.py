@@ -30,7 +30,14 @@ class Supplier(Base):
     """Voce del registro fornitori ICT critici (Modulo 4 — Supply Chain Risk)."""
 
     __tablename__ = "suppliers"
-    __table_args__ = (Index("ix_suppliers_org_status", "organization_id", "status"),)
+    __table_args__ = (
+        Index("ix_suppliers_org_status", "organization_id", "status"),
+        # Fase 10 (performance): GET /suppliers filtra per organization_id e ordina per
+        # created_at desc — l'indice sopra (pensato per un futuro filtro per stato) non
+        # copre l'ordinamento, quindi senza questo Postgres dovrebbe comunque ordinare a
+        # parte ogni volta che la lista cresce.
+        Index("ix_suppliers_org_created", "organization_id", "created_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

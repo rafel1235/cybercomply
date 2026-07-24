@@ -88,7 +88,7 @@ export default function ComplianceReportPage() {
         </table>
       </section>
 
-      <footer className="mt-6 text-xs text-slate-400">
+      <footer className="mt-6 text-xs text-slate-500">
         Report generato automaticamente da CyberComplyIT. Non costituisce parere legale.
       </footer>
     </div>

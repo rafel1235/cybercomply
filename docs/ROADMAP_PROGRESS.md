@@ -398,7 +398,80 @@ La pipeline CI/CD non è mai stata eseguita su un runner GitHub reale (nessun re
 remoto collegato in questa sessione): verificata leggendo ed eseguendo localmente ogni
 comando che contiene, non osservandola girare su GitHub.
 
+## Fase 10 — Performance e qualità — ✅ completata e verificata
+- [x] **Paginazione**: `documents`, `incidents`, `suppliers`, `assessments` e
+      `compliance/history` (le liste che crescono nel tempo con l'uso della piattaforma)
+      ora accettano `limit`/`offset` (default 50, massimo 200, valori fuori range
+      riportati a un intervallo sicuro invece di un errore) e restituiscono il conteggio
+      totale nell'header `X-Total-Count` — mai più un array illimitato, come richiesto
+      dalla roadmap. Codice condiviso in `app/core/pagination.py`. Il corpo della risposta
+      resta una lista semplice (stesso pattern già in uso per `GET /audit-log` dalla Fase
+      4): nessuna modifica richiesta al frontend esistente.
+- [x] **Bug reale scoperto e corretto — query N+1**: `list_incidents` e `list_suppliers`
+      leggevano una relazione (`incident.notifications` / `supplier.questionnaires`) per
+      ogni riga senza eager loading, eseguendo una query SQL separata per ogni elemento
+      della pagina. Corretto con `selectinload`. Verificato concretamente in
+      `tests/test_query_efficiency.py`, che conta le query SQL eseguite e confronta 2
+      righe vs 8 righe: prima della correzione 8 query con 2 righe e 14 con 8 (+1 per
+      riga, la firma classica di un N+1); dopo, il conteggio resta identico
+      indipendentemente dal numero di righe.
+- [x] **Indici mancanti trovati con `EXPLAIN ANALYZE`** (migration `c4e8f1a9b7d3`):
+      `audit_logs` non aveva alcun indice oltre alla chiave primaria, pur essendo la
+      tabella con la crescita più rapida di tutto lo schema e interrogata ad ogni
+      caricamento della dashboard — un test con 20.000 righe ha mostrato una scansione
+      sequenziale + ordinamento (2.9 ms) prima della correzione, un index scan diretto
+      (0.08 ms, ~35 volte più veloce) dopo aver aggiunto due indici compositi. Aggiunto
+      anche un indice mancante su `suppliers` per l'ordinamento reale della lista.
+- [x] **Tempi di risposta**: misurati (TestClient, 10 richieste per endpoint dopo
+      warm-up) tra 17 e 31 ms sui principali endpoint di lettura — ben sotto il budget di
+      500ms richiesto dalla roadmap (esclusa la generazione documenti con AI).
+- [x] **Caching valutato, non implementato**: con gli indici sopra, le query rispondono
+      già in sotto-millisecondo — introdurre Redis non è giustificato senza un carico
+      reale che lo richieda. Decisione motivata in `docs/PERFORMANCE.md`.
+- [x] **Bug reale scoperto e corretto — link interni come `<a>` invece di `next/link`**:
+      5 collegamenti verso `/settings/billing` forzavano un ricaricamento completo della
+      pagina invece di una transizione lato client istantanea (e non venivano mai
+      prefetchati). Corretti tutti in `next/link`; verificato che non ne resti nessun
+      altro in tutta l'app.
+- [x] **Bundle, immagini, font**: nessuna libreria pesante nelle dipendenze, nessuna
+      immagine nell'app (`next/image` non ha nulla da ottimizzare), nessun font esterno
+      caricato (zero rischio FOUT per costruzione). Code-splitting per-route già
+      automatico via App Router, nessun componente abbastanza pesante da giustificare
+      `next/dynamic`.
+- [x] **Accessibilità (WCAG AA)**: nessun elemento interattivo non nativo (niente `<div
+      onClick>`, tutto già navigabile da tastiera). Bug reale corretto: i pulsanti-filtro
+      di stato in Incident Reporting non comunicavano quale fosse selezionato ad uno
+      screen reader (aggiunto `aria-pressed`/`role="group"`). Aggiunto `aria-label` a 8
+      controlli di form senza etichetta associata (select di filtro, textarea di note,
+      campo di ricerca — prima solo `placeholder`, l'anti-pattern segnalato dalla
+      roadmap). Aggiunto `role="alert"`/`role="status"` ai toast (prima invisibili a uno
+      screen reader — WCAG 4.1.3). Trovato e corretto un problema di contrasto reale e
+      diffuso: `text-slate-400` (~2.6:1 su bianco, sotto la soglia AA di 4.5:1) era usato
+      per quasi tutto il testo secondario dell'app in 14 file — sostituito con
+      `text-slate-500` (~4.76:1). Rafforzato l'indicatore di focus (solo un cambio di
+      bordo, ora anche un anello visibile) su 12 campi di form.
+
+**Nota importante**: Lighthouse non è stato eseguibile in questo ambiente sandbox (nessun
+Chrome/Chromium disponibile) — il target "90+" della roadmap non è stato misurato con lo
+strumento reale, solo verificato indirettamente (bundle, font, immagini, navigazione). Il
+test con screen reader reale (VoiceOver/NVDA) richiesto dalla roadmap non è stato
+eseguito, per lo stesso motivo (nessun sistema operativo con screen reader in sandbox). Il
+dettaglio completo di ogni punto sopra, incluse le misurazioni prima/dopo, è in
+`docs/PERFORMANCE.md` e `docs/ACCESSIBILITA.md`.
+
 ## Verifica eseguita (non solo scritta: testata davvero)
+- **Verifica finale Fase 10**: nessuna nuova tabella in questa fase, solo indici
+  aggiuntivi (migration `c4e8f1a9b7d3`, riapplicata da zero su Postgres reale insieme a
+  tutte le precedenti — verificato con successo). **222/222 test automatici passati**
+  (213 precedenti + 7 di paginazione + 2 di non-regressione N+1, questi ultimi verificati
+  in entrambe le direzioni: falliscono se si toglie `selectinload`, come confermato
+  disattivandolo temporaneamente durante lo sviluppo). Copertura (`pytest-cov`): **96%
+  (2329 statement, 87 non coperti)**. Lint (`ruff`) e formattazione (`black --check`)
+  puliti su `app/`, `tests/` e `migrations/`. Frontend: `tsc --noEmit` pulito, `next lint`
+  pulito, `next build` completata con successo, **19 route invariate** (nessuna nuova
+  pagina in questa fase, solo correzioni di performance/accessibilità). Diff completo tra
+  la copia di verifica Linux e la cartella consegnata (`apps/api` e `apps/web`): nessuna
+  differenza su tutti i file toccati in questa fase.
 - **Verifica finale Fase 9**: nessuna nuova migration in questa fase. **213/213 test
   automatici passati** (205 precedenti + 8 nuovi per `pdf_storage.py`: salvataggio/lettura
   locale invariati quando Supabase Storage non è configurato, upload e download da
@@ -542,8 +615,10 @@ comando che contiene, non osservandola girare su GitHub.
 - Repository Git locale creato con commit iniziale in questa cartella.
 
 ## Fasi successive (non ancora iniziate)
-Fase 10 (performance), Fase 11 (lancio) — da eseguire un modulo alla volta, come da
-preferenza espressa. Nota: `scripts/send_scheduled_emails.py` ha ora una pipeline CI/CD
+Fase 11 (lancio) — da eseguire un modulo alla volta, come da preferenza espressa. Da
+Fase 10 restano da fare, quando gli strumenti reali saranno disponibili: una misurazione
+Lighthouse reale (90+ target, non eseguibile in questa sandbox senza Chrome) e un test con
+screen reader reale (VoiceOver/NVDA). Nota: `scripts/send_scheduled_emails.py` ha ora una pipeline CI/CD
 pronta (Fase 9) ma non è ancora collegato a un vero cron giornaliero — questo richiede un
 account Render/GitHub reale (Render Cron Job o GitHub Actions schedulato) e resta da fare
 appena quegli account esisteranno; anche il downgrade trial→Free resta calcolato "lazy"

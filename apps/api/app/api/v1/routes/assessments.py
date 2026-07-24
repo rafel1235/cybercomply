@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentMembership, get_current_membership, get_db
+from app.core.pagination import DEFAULT_LIMIT, apply_pagination
 from app.models.assessment import AssessmentResult
 from app.schemas.assessment import AssessmentCreateRequest, AssessmentResultOut
 from app.services.assessment_classifier import AssessmentAnswersData, classify
@@ -71,14 +72,19 @@ def get_latest_assessment(
 
 @router.get("", response_model=list[AssessmentResultOut])
 def list_assessments(
+    response: Response,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
     membership: CurrentMembership = Depends(get_current_membership),
     db: Session = Depends(get_db),
 ) -> list[AssessmentResultOut]:
-    """Storico completo degli assessment eseguiti, dal più recente al più vecchio."""
-    results = (
-        db.query(AssessmentResult)
-        .filter(AssessmentResult.organization_id == membership.organization.id)
-        .order_by(AssessmentResult.created_at.desc())
-        .all()
+    """Storico degli assessment eseguiti, dal più recente al più vecchio. Paginato
+    (Fase 10 — performance): `limit`/`offset` mai illimitati, conteggio totale
+    nell'header `X-Total-Count`."""
+    query = db.query(AssessmentResult).filter(
+        AssessmentResult.organization_id == membership.organization.id
     )
+    query = query.order_by(AssessmentResult.created_at.desc())
+    query = apply_pagination(query, response, limit=limit, offset=offset)
+    results = query.all()
     return [_to_out(r) for r in results]

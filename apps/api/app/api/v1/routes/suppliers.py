@@ -1,8 +1,8 @@
 import secrets
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import (
     CurrentMembership,
@@ -11,6 +11,7 @@ from app.api.deps import (
     require_admin,
     require_supply_chain,
 )
+from app.core.pagination import DEFAULT_LIMIT, apply_pagination
 from app.models.supplier import (
     Supplier,
     SupplierCriticality,
@@ -66,15 +67,25 @@ def _get_owned_supplier(db: Session, organization_id, supplier_id) -> Supplier:
 
 @router.get("", response_model=list[SupplierOut])
 def list_suppliers(
+    response: Response,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
     membership: CurrentMembership = Depends(get_current_membership),
     db: Session = Depends(get_db),
 ) -> list[SupplierOut]:
-    suppliers = (
+    """Paginato (Fase 10 — performance): `limit`/`offset` mai illimitati, conteggio totale
+    nell'header `X-Total-Count`. `selectinload` sui questionari evita un bug reale di
+    query N+1 scoperto in questa fase: senza, `_to_out` (che legge
+    `supplier.questionnaires`) eseguiva una query separata per ogni fornitore della
+    pagina."""
+    query = (
         db.query(Supplier)
+        .options(selectinload(Supplier.questionnaires))
         .filter(Supplier.organization_id == membership.organization.id)
-        .order_by(Supplier.created_at.desc())
-        .all()
     )
+    query = query.order_by(Supplier.created_at.desc())
+    query = apply_pagination(query, response, limit=limit, offset=offset)
+    suppliers = query.all()
     return [_to_out(s) for s in suppliers]
 
 

@@ -82,7 +82,7 @@ export default function DashboardPage() {
                 style={{ width: `${scoreQuery.data?.score_percent ?? 0}%` }}
               />
             </div>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-slate-500">
               {scoreQuery.data
                 ? `${scoreQuery.data.measures_conformi}/${scoreQuery.data.measures_total} misure conformi`
                 : "Nessun dato"}
@@ -130,7 +130,7 @@ export default function DashboardPage() {
             ) : (
               <>
                 <p className="text-2xl font-bold text-brand-dark">—</p>
-                <p className="mt-1 text-xs text-slate-400">Disponibile dopo l&apos;assessment</p>
+                <p className="mt-1 text-xs text-slate-500">Disponibile dopo l&apos;assessment</p>
               </>
             )}
           </div>
@@ -199,7 +199,7 @@ export default function DashboardPage() {
               {visibleAuditEntries.map((entry) => (
                 <li key={entry.id} className="flex items-center justify-between text-sm">
                   <span className="text-slate-700">{auditActionLabel(entry.action)}</span>
-                  <span className="text-xs text-slate-400">{formatDateTime(entry.created_at)}</span>
+                  <span className="text-xs text-slate-500">{formatDateTime(entry.created_at)}</span>
                 </li>
               ))}
             </ul>

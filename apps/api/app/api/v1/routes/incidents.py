@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import extract
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import (
     CurrentMembership,
@@ -10,6 +10,7 @@ from app.api.deps import (
     get_db,
     require_incident_reporting,
 )
+from app.core.pagination import DEFAULT_LIMIT, apply_pagination
 from app.models.incident import (
     Incident,
     IncidentNotification,
@@ -90,12 +91,22 @@ def _next_reference_code(db: Session, organization_id) -> str:
 
 @router.get("", response_model=list[IncidentOut])
 def list_incidents(
+    response: Response,
     status_filter: str | None = None,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
     membership: CurrentMembership = Depends(get_current_membership),
     db: Session = Depends(get_db),
 ) -> list[IncidentOut]:
-    query = db.query(Incident).filter(
-        Incident.organization_id == membership.organization.id
+    """Paginato (Fase 10 — performance): `limit`/`offset` mai illimitati, conteggio totale
+    nell'header `X-Total-Count`. `selectinload` sulle notifiche evita un bug reale di
+    query N+1 scoperto in questa fase: senza, `_to_out` (che legge `incident.notifications`
+    per calcolare le scadenze) eseguiva una query separata per ogni incidente della
+    pagina — fino a `limit` query aggiuntive per una singola richiesta."""
+    query = (
+        db.query(Incident)
+        .options(selectinload(Incident.notifications))
+        .filter(Incident.organization_id == membership.organization.id)
     )
     if status_filter is not None:
         if status_filter not in IncidentStatus._value2member_map_:
@@ -104,7 +115,9 @@ def list_incidents(
                 detail="Stato non valido",
             )
         query = query.filter(Incident.status == IncidentStatus(status_filter))
-    incidents = query.order_by(Incident.opened_at.desc()).all()
+    query = query.order_by(Incident.opened_at.desc())
+    query = apply_pagination(query, response, limit=limit, offset=offset)
+    incidents = query.all()
     return [_to_out(i) for i in incidents]
 
 

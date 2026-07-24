@@ -101,7 +101,7 @@ export default function AssessmentPage() {
               onChange={(e) =>
                 setAnswers((a) => ({ ...a, employee_count: Number(e.target.value) }))
               }
-              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none"
+              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
             />
           </label>
 
@@ -114,7 +114,7 @@ export default function AssessmentPage() {
               onChange={(e) =>
                 setAnswers((a) => ({ ...a, annual_revenue_eur: Number(e.target.value) }))
               }
-              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none"
+              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
             />
           </label>
 
@@ -180,7 +180,7 @@ export default function AssessmentPage() {
           {latestQuery.data.rationale && (
             <p className="text-sm text-slate-600">{latestQuery.data.rationale}</p>
           )}
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             Ultimo assessment eseguito il {formatDateTime(latestQuery.data.created_at)}
           </p>
         </div>

@@ -150,7 +150,7 @@ export default function SuppliersPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none"
+              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
@@ -160,7 +160,7 @@ export default function SuppliersPage() {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="Es. hosting, software gestionale, consulenza…"
-              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none"
+              className="rounded-md border border-slate-300 px-3 py-2 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
             />
           </label>
           <fieldset className="flex flex-col gap-2">
@@ -219,6 +219,7 @@ export default function SuppliersPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <select
+                      aria-label={`Criticità di ${supplier.name}`}
                       value={supplier.criticality}
                       onChange={(e) => handleCriticalityChange(supplier, e.target.value)}
                       className="rounded-md border border-slate-300 px-2 py-1 text-xs"
@@ -253,7 +254,7 @@ export default function SuppliersPage() {
                     </button>
                   )}
                   {supplier.last_reviewed_at && (
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-slate-500">
                       Ultima revisione: {formatDate(supplier.last_reviewed_at)}
                     </span>
                   )}
@@ -297,7 +298,7 @@ export default function SuppliersPage() {
                       </div>
                     ))}
                     {latestQuestionnaire === undefined && (
-                      <p className="text-xs text-slate-400">Nessun questionario ancora inviato.</p>
+                      <p className="text-xs text-slate-500">Nessun questionario ancora inviato.</p>
                     )}
                   </div>
                 )}

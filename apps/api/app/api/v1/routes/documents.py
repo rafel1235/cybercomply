@@ -10,6 +10,7 @@ from app.api.deps import (
     get_db,
     require_admin,
 )
+from app.core.pagination import DEFAULT_LIMIT, apply_pagination
 from app.models.assessment import AssessmentResult
 from app.models.document import Document, DocumentType
 from app.schemas.document import (
@@ -68,11 +69,16 @@ def _get_owned_document(db: Session, organization_id, document_id) -> Document:
 
 @router.get("", response_model=list[DocumentOut])
 def list_documents(
+    response: Response,
     doc_type: str | None = None,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
     membership: CurrentMembership = Depends(get_current_membership),
     db: Session = Depends(get_db),
 ) -> list[DocumentOut]:
-    """Storico completo dei documenti generati (tutte le versioni), dal più recente."""
+    """Storico dei documenti generati (tutte le versioni), dal più recente. Paginato
+    (Fase 10 — performance): `limit`/`offset` mai illimitati, conteggio totale nell'header
+    `X-Total-Count`."""
     query = db.query(Document).filter(
         Document.organization_id == membership.organization.id
     )
@@ -83,7 +89,9 @@ def list_documents(
                 detail="Tipo documento non valido",
             )
         query = query.filter(Document.doc_type == DocumentType(doc_type))
-    documents = query.order_by(Document.created_at.desc()).all()
+    query = query.order_by(Document.created_at.desc())
+    query = apply_pagination(query, response, limit=limit, offset=offset)
+    documents = query.all()
     return [_to_out(d) for d in documents]
 
 

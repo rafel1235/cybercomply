@@ -122,7 +122,7 @@ export default function PublicQuestionnairePage() {
               variant={SUPPLIER_STATUS_VARIANTS[computedStatus] ?? "neutral"}
             />
           )}
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             Grazie per aver completato la valutazione. Non è necessaria nessuna altra azione.
           </p>
         </div>
