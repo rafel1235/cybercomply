@@ -15,10 +15,46 @@ import stripe
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.models.organization import Organization, OrganizationMember, OrganizationRole
 from app.models.subscription import Plan, Subscription, SubscriptionStatus
+from app.models.user import User
+from app.services import email_service
 from app.services.audit import record_audit_event
+from app.services.email_templates import (
+    payment_failed_email,
+    payment_succeeded_email,
+    subscription_canceled_email,
+)
 
 logger = logging.getLogger(__name__)
+
+_PLAN_LABELS = {
+    Plan.free: "Free",
+    Plan.essential: "Essential",
+    Plan.business: "Business",
+    Plan.enterprise: "Enterprise",
+}
+
+
+def _admin_emails(db: Session, organization_id) -> list[str]:
+    """Destinatari delle email di fatturazione: tutti gli admin dell'organizzazione (non
+    solo chi ha avviato il checkout), così ogni amministratore viene informato di
+    pagamenti falliti o abbonamenti cancellati."""
+    rows = (
+        db.query(User.email)
+        .join(OrganizationMember, OrganizationMember.user_id == User.id)
+        .filter(
+            OrganizationMember.organization_id == organization_id,
+            OrganizationMember.role == OrganizationRole.admin,
+        )
+        .all()
+    )
+    return [row[0] for row in rows]
+
+
+def _notify_admins(db: Session, organization_id, subject: str, html: str) -> None:
+    for admin_email in _admin_emails(db, organization_id):
+        email_service.send_email(to=admin_email, subject=subject, html=html)
 
 
 class BillingError(Exception):
@@ -224,6 +260,16 @@ def _handle_payment_succeeded(db: Session, invoice: dict) -> None:
         details={"plan": subscription.plan.value},
     )
 
+    organization = db.get(Organization, subscription.organization_id)
+    settings = get_settings()
+    subject, html = payment_succeeded_email(
+        organization_name=organization.name if organization else "",
+        plan_label=_PLAN_LABELS.get(subscription.plan, subscription.plan.value),
+        invoice_url=invoice.get("hosted_invoice_url"),
+        billing_url=f"{settings.frontend_base_url}/settings/billing",
+    )
+    _notify_admins(db, subscription.organization_id, subject, html)
+
 
 def _handle_payment_failed(db: Session, invoice: dict) -> None:
     subscription = _find_by_customer(db, invoice.get("customer"))
@@ -240,6 +286,15 @@ def _handle_payment_failed(db: Session, invoice: dict) -> None:
         entity="subscription",
         details={"plan": subscription.plan.value},
     )
+
+    organization = db.get(Organization, subscription.organization_id)
+    settings = get_settings()
+    subject, html = payment_failed_email(
+        organization_name=organization.name if organization else "",
+        plan_label=_PLAN_LABELS.get(subscription.plan, subscription.plan.value),
+        billing_url=f"{settings.frontend_base_url}/settings/billing",
+    )
+    _notify_admins(db, subscription.organization_id, subject, html)
 
 
 def _handle_subscription_deleted(db: Session, stripe_subscription: dict) -> None:
@@ -259,6 +314,14 @@ def _handle_subscription_deleted(db: Session, stripe_subscription: dict) -> None
         organization_id=subscription.organization_id,
         entity="subscription",
     )
+
+    organization = db.get(Organization, subscription.organization_id)
+    settings = get_settings()
+    subject, html = subscription_canceled_email(
+        organization_name=organization.name if organization else "",
+        billing_url=f"{settings.frontend_base_url}/settings/billing",
+    )
+    _notify_admins(db, subscription.organization_id, subject, html)
 
 
 def _handle_subscription_updated(db: Session, stripe_subscription: dict) -> None:

@@ -65,6 +65,18 @@ class Settings(BaseSettings):
             "replace-with"
         )
 
+    # --- Resend (Fase 7 — email transazionali) ---
+    resend_api_key: str = ""
+    # Deve corrispondere a un dominio verificato (SPF/DKIM/DMARC) sul progetto Resend
+    # prima del lancio commerciale — vedi nota in .env.example.
+    email_from_address: str = "CyberComplyIT <noreply@cybercomplyit.it>"
+
+    @property
+    def email_configured(self) -> bool:
+        return bool(self.resend_api_key) and not self.resend_api_key.startswith(
+            "replace-with"
+        )
+
     @property
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]

@@ -38,3 +38,15 @@ class InviteMemberResponse(BaseModel):
     invited_email: EmailStr
     invite_token: str
     expires_at: datetime
+
+
+class InvitePublicOut(BaseModel):
+    """Anteprima pubblica di un invito (nessuna autenticazione: il possesso del token,
+    ricevuto via email, è di per sé la credenziale), mostrata dalla pagina di
+    registrazione prima di creare l'account."""
+
+    organization_name: str
+    invited_email: EmailStr
+    role: str
+    valid: bool
+    reason: str | None = None

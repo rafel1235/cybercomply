@@ -29,10 +29,15 @@ class OrganizationOut(BaseModel):
 class SyncUserRequest(BaseModel):
     """Payload inviato dal frontend subito dopo login/registrazione riuscita su Supabase,
     per creare (o aggiornare) lo specchio locale dell'utente e, alla prima registrazione,
-    l'organizzazione associata."""
+    l'organizzazione associata.
+
+    Fase 7: `invite_token`, se presente e valido, fa sì che il nuovo utente si unisca
+    all'organizzazione che lo ha invitato invece di ricevere una propria organizzazione
+    nuova (vedi `get_public_invite` per la verifica pubblica dello stesso token)."""
 
     full_name: str | None = None
     organization_name: str | None = None
+    invite_token: str | None = None
 
 
 class MeResponse(BaseModel):

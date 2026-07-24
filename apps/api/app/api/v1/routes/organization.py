@@ -11,6 +11,7 @@ from app.api.deps import (
     get_db,
     require_admin,
 )
+from app.core.config import get_settings
 from app.models.organization import (
     OrganizationInvite,
     OrganizationMember,
@@ -24,10 +25,14 @@ from app.schemas.organization import (
     OrganizationOut,
     OrganizationUpdateRequest,
 )
+from app.services import email_service
 from app.services.audit import record_audit_event
+from app.services.email_templates import invite_email
 from app.services.entitlements import PlanEntitlements
 
 router = APIRouter(prefix="/organization", tags=["organization"])
+
+_ROLE_LABELS = {"admin": "Amministratore", "viewer": "Viewer"}
 
 
 @router.get("", response_model=OrganizationOut)
@@ -207,6 +212,18 @@ def invite_member(
         details={"invited_email": payload.email, "role": role.value},
         ip_address=request.client.host if request.client else None,
     )
+
+    # Fase 7: invio dell'email di invito. Un problema di invio non deve mai far fallire
+    # l'invito stesso (send_email non solleva mai eccezioni): l'invito resta comunque
+    # creato e valido, consultabile/rigenerabile dall'admin anche se l'email non arriva.
+    settings = get_settings()
+    subject, html = invite_email(
+        organization_name=membership.organization.name,
+        inviter_name=membership.user.full_name or membership.user.email,
+        role_label=_ROLE_LABELS.get(role.value, role.value),
+        accept_url=f"{settings.frontend_base_url}/register?invite={token}",
+    )
+    email_service.send_email(to=payload.email, subject=subject, html=html)
 
     return InviteMemberResponse(
         invited_email=payload.email, invite_token=token, expires_at=expires_at

@@ -1,6 +1,7 @@
 from app.models.organization import OrganizationMember, OrganizationRole
 from app.models.subscription import Plan, Subscription
 from app.models.user import User
+from app.services import email_service
 from tests.conftest import make_token
 
 
@@ -116,6 +117,41 @@ def test_invite_creates_pending_invite(client, db_session):
     body = resp.json()
     assert body["invited_email"] == "collega@cybercomplyit.it"
     assert len(body["invite_token"]) > 20
+
+
+def test_invite_sends_email_to_invited_address(client, db_session, monkeypatch):
+    token, org_id = _sync(
+        client, "org-invite-email@cybercomplyit.it", "Org Invite Email Srl"
+    )
+    subscription = (
+        db_session.query(Subscription)
+        .filter(Subscription.organization_id == org_id)
+        .first()
+    )
+    subscription.plan = Plan.business
+    db_session.commit()
+
+    captured = {}
+
+    def _fake_send_email(*, to, subject, html):
+        captured["to"] = to
+        captured["subject"] = subject
+        captured["html"] = html
+        return True
+
+    monkeypatch.setattr(email_service, "send_email", _fake_send_email)
+
+    resp = client.post(
+        "/api/v1/organization/invites",
+        json={"email": "invitato-email@cybercomplyit.it", "role": "viewer"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    invite_token = resp.json()["invite_token"]
+
+    assert captured["to"] == "invitato-email@cybercomplyit.it"
+    assert "Org Invite Email Srl" in captured["html"]
+    assert invite_token in captured["html"]
 
 
 def test_invite_blocked_at_seat_limit(client):

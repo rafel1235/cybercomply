@@ -211,7 +211,79 @@ vanno impostate le chiavi reali (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
 `STRIPE_PRICE_ID_ESSENTIAL`, `STRIPE_PRICE_ID_BUSINESS`) in `apps/api/.env` e va eseguito
 almeno un ciclo completo di checkout/webhook contro l'ambiente di test di Stripe.
 
+## Fase 7 — Email transazionali e notifiche — ✅ completata e verificata
+- [x] **Bug scoperto e corretto prima di poter partire**: dopo la conferma email,
+      `/auth/sync` non veniva mai chiamato (solo `login.tsx` lo chiamava, e solo dopo un
+      login con password) — un utente che confermava l'email e andava dritto in
+      dashboard non aveva mai un'organizzazione creata. `confirm/page.tsx` ora chiama
+      `/auth/sync` con i metadati salvati alla registrazione (nome azienda, nome
+      completo), che prima andavano persi perché `login.tsx` inviava un body vuoto.
+- [x] **Flusso di accettazione invito**, mai esistito prima d'ora: `OrganizationInvite`
+      veniva creato ma non c'era alcun modo di redimerlo — chi si registrava con
+      l'email invitata otteneva comunque una propria organizzazione nuova. Aggiunto
+      endpoint pubblico `GET /public/invites/{token}` (anteprima senza autenticazione,
+      come per i questionari fornitori), `SyncUserRequest.invite_token`, e
+      `sync_user` che unisce l'utente all'organizzazione dell'invito (con il ruolo
+      scelto dall'admin) invece di crearne una nuova — solo se il token è valido, non
+      scaduto, non già accettato, e per l'email corrispondente (altrimenti ignorato in
+      silenzio, stesso principio di degradazione controllata di AI/Stripe). Pagina di
+      registrazione aggiornata per leggere `?invite=token`, mostrare "Stai per unirti
+      a…" e passare il token attraverso Supabase fino al momento della conferma email.
+- [x] `app/services/email_service.py`: invio email transazionali via l'API REST di
+      Resend (solo `httpx`, nessun SDK nuovo, stesso principio del client AI di Fase 5).
+      Se `RESEND_API_KEY` non è configurata, o la chiamata a Resend fallisce, l'invio
+      viene semplicemente saltato e loggato — mai un'eccezione: nessuna email può far
+      fallire la registrazione, un invito, o un webhook di pagamento.
+- [x] `app/services/email_templates.py`: wrapper HTML brandizzato responsive (stile
+      inline, struttura a tabella per compatibilità Gmail/Outlook) più 11 template —
+      benvenuto, invito team, pagamento riuscito (con link fattura da Stripe se
+      disponibile)/fallito, abbonamento annullato, trial in scadenza (7gg/1gg) e scaduto,
+      scadenza normativa NIS2/CRA in avvicinamento, incidente aperto senza notifica 24h,
+      fornitore fermo da 6+ mesi, report mensile di conformità.
+- [x] Email collegate agli eventi che accadono già in una request: benvenuto (nuova
+      organizzazione in `sync_user`), invito (creazione invito in `organization.py`),
+      pagamento riuscito/fallito/abbonamento cancellato (i 3 handler webhook di Stripe
+      già scritti in Fase 6, ora inviano email a tutti gli admin dell'organizzazione).
+- [x] `scripts/send_scheduled_emails.py`: le email che richiedono una scansione
+      periodica (trial in scadenza/scaduto, scadenze NIS2/CRA, incidente senza notifica
+      24h, fornitore fermo, report mensile) non hanno ancora un vero scheduler (arriva
+      in Fase 9): script eseguibile manualmente ora, con funzioni testabili
+      singolarmente e pronte per un cron reale. Idempotente tramite l'audit log come
+      marcatore "già inviato" (un'action dedicata per alert, con l'identificativo
+      incorporato dove serve un promemoria per-entità), così eseguirlo più volte lo
+      stesso giorno non invia email duplicate. Riusa direttamente il calcolo dello score
+      di `GET /compliance/score` per il report mensile, invece di duplicarlo.
+
+**Nota importante**: come per `ANTHROPIC_API_KEY` (Fase 5) e le chiavi Stripe (Fase 6),
+`RESEND_API_KEY` non è mai stata impostata con un valore reale in questa sessione — ogni
+invio è stato verificato con `httpx.post` sostituito da un doppio di test. Prima del
+lancio commerciale vanno: impostata una chiave Resend reale, verificato il dominio
+mittente (SPF/DKIM/DMARC) altrimenti le email finiscono in spam o vengono rifiutate, e
+collegato `scripts/send_scheduled_emails.py` a un vero cron giornaliero (Fase 9).
+
+**Scelta deliberata, fuori dal perimetro di questo backend**: conferma registrazione e
+reset password restano email native di Supabase Auth (già funzionanti, mai in questa
+sessione sostituite), non email inviate da CyberComplyIT. Personalizzarle graficamente
+richiede configurare l'SMTP custom sul progetto Supabase reale (dashboard, non codice):
+da fare quando il progetto Supabase reale sarà collegato.
+
 ## Verifica eseguita (non solo scritta: testata davvero)
+- Backend Fase 7: migration esistenti riapplicate da zero su Postgres reale (nessuna
+  nuova tabella in questa fase), **178/178 test automatici passati** (165 precedenti +
+  13 nuovi: redenzione invito valido/email sbagliata/scaduto/già accettato, anteprima
+  pubblica invito nei 4 casi, invio email mockato per benvenuto/invito/pagamento
+  riuscito/fallito/abbonamento cancellato con verifica esplicita del destinatario e del
+  contenuto, e l'intero script di alert schedulati — trial in scadenza a 7/1 giorni e
+  idempotenza, trial scaduto con downgrade effettivo, scadenze NIS2 nei 2 casi "stessa
+  data = 2 email distinte" e "fuori finestra = nessuna email", incidente scoperto dopo
+  20h/già notificato/chiuso, fornitore mai valutato/valutato di recente, report mensile
+  e relativa idempotenza, aggregatore `run_all`). Copertura: **96%** (2006 statement, 74
+  non coperti). Lint (`ruff`) e formattazione (`black`) puliti su tutti i file
+  nuovi/modificati di questa fase (alcuni file di modelli invariati da fasi precedenti
+  risultano non formattati secondo la versione attuale di `black`: non toccati, per non
+  introdurre modifiche estranee al perimetro di questa fase).
+- Frontend Fase 7: `tsc --noEmit` pulito, `next lint` pulito, nessun warning, sulle
+  pagine modificate (`register`, `confirm`).
 - Backend Fase 6: migration riapplicata da zero su Postgres reale (colonna
   `stripe_customer_id` + indice), **132/132 test automatici passati** (86 precedenti + 46
   nuovi: entitlements per piano, trial e relativo downgrade automatico, integrazione
@@ -288,11 +360,12 @@ almeno un ciclo completo di checkout/webhook contro l'ambiente di test di Stripe
 - Repository Git locale creato con commit iniziale in questa cartella.
 
 ## Fasi successive (non ancora iniziate)
-Fase 7 (email transazionale — serve anche a completare davvero l'invio degli inviti team e
-delle conferme di registrazione, per ora solo salvati/loggati), Fase 8 (sicurezza estesa),
-Fase 9 (infrastruttura/deploy — anche per spostare il downgrade trial→Free su un cron reale
-invece del calcolo lazy attuale), Fase 10 (performance), Fase 11 (lancio) — da eseguire un
-modulo alla volta, come da preferenza espressa. Prima del lancio commerciale vanno anche:
-impostata una vera `ANTHROPIC_API_KEY` e validati i prompt con un esperto legale (Fase 5);
-impostate le chiavi Stripe reali ed eseguito un ciclo di checkout/webhook contro il suo
-ambiente di test (Fase 6).
+Fase 8 (sicurezza estesa), Fase 9 (infrastruttura/deploy — anche per collegare
+`scripts/send_scheduled_emails.py` a un vero cron giornaliero invece dell'esecuzione
+manuale attuale, e per spostare il downgrade trial→Free su quel cron invece del calcolo
+lazy attuale), Fase 10 (performance), Fase 11 (lancio) — da eseguire un modulo alla volta,
+come da preferenza espressa. Prima del lancio commerciale vanno anche: impostata una vera
+`ANTHROPIC_API_KEY` e validati i prompt con un esperto legale (Fase 5); impostate le
+chiavi Stripe reali ed eseguito un ciclo di checkout/webhook contro il suo ambiente di
+test (Fase 6); impostata una vera `RESEND_API_KEY` con dominio mittente verificato
+SPF/DKIM/DMARC (Fase 7).

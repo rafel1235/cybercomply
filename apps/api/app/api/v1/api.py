@@ -10,6 +10,7 @@ from app.api.v1.routes import (
     health,
     incidents,
     organization,
+    public_invites,
     public_questionnaires,
     suppliers,
 )
@@ -24,5 +25,6 @@ api_router.include_router(documents.router)
 api_router.include_router(incidents.router)
 api_router.include_router(suppliers.router)
 api_router.include_router(public_questionnaires.router)
+api_router.include_router(public_invites.router)
 api_router.include_router(audit.router)
 api_router.include_router(billing.router)
