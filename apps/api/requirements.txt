@@ -11,21 +11,5 @@ httpx>=0.27.2
 python-dotenv==1.0.1
 email-validator>=2.2.0
 stripe>=10.0.0
-# Già una dipendenza transitiva di python-jose[cryptography]; dichiarata esplicitamente
-# da Fase 8 in poi perché ora è importata direttamente (cifratura campi sensibili).
 cryptography>=43.0.0
-# Error tracking in produzione (Fase 9). Inattivo finché SENTRY_DSN non è configurato,
-# vedi app/core/monitoring.py.
 sentry-sdk>=2.0.0
-
-# dev / test
-pytest>=8.3.3
-pytest-cov>=5.0.0
-ruff>=0.6.9
-black>=24.8.0
-Faker>=28.0.0
-# Postgres incorporato per i test (Fase 0): permette a `pytest` di funzionare da subito
-# dopo un clone, senza Docker né un Postgres locale già in esecuzione. Da Fase 9 in poi è
-# anche l'unica fonte del `DATABASE_URL` usato dai test (vedi tests/conftest.py):
-# `DATABASE_URL` di `.env` non viene mai letto durante i test, per sicurezza.
-pgserver>=0.1.6
